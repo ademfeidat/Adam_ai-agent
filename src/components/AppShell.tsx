@@ -12,12 +12,14 @@ import {
   Globe,
   Settings as SettingsIcon,
   Server,
+  Award,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { ChatConversation, Language, ViewId } from '../core/domain';
 import { BrandMark } from './BrandMark';
 import { Sidebar } from './Sidebar';
+import { PatentDossierModal } from './PatentDossierModal';
 import { copy } from '../core/i18n';
 import { LiveVoiceModal } from '../features/live/LiveVoiceModal';
 import {
@@ -98,6 +100,7 @@ export function AppShell({
   const [activeConvId, setActiveConvId] = useState<string>(() => loadConversation().id);
   const [memoryStats, setMemoryStats] = useState(() => getInfiniteMemoryStats());
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
+  const [isPatentModalOpen, setIsPatentModalOpen] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
   const toolsMenuRef = useRef<HTMLDivElement>(null);
 
@@ -247,10 +250,12 @@ export function AppShell({
             <PanelLeft size={16} className={isAr ? 'rotate-180' : ''} />
           </button>
 
-          <button
-            type="button"
+          <div
+            role="button"
+            tabIndex={0}
             className="flex items-center gap-2 cursor-pointer group ms-0.5 sm:ms-1"
             onClick={() => onViewChange('chat')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onViewChange('chat'); }}
             title="ADEM AI"
             aria-label="ADEM AI Home"
           >
@@ -262,12 +267,23 @@ export function AppShell({
                 <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-semibold">
                   v4.0
                 </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsPatentModalOpen(true);
+                  }}
+                  className="hidden lg:flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-950/50 border border-cyan-500/35 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-900/50 transition cursor-pointer text-[9.5px] font-mono tracking-wider shadow-xs"
+                  title={isAr ? 'عرض وثيقة براءة الاختراع السيبراني' : 'View Cyber-Patent Dossier'}
+                >
+                  <Award size={11} className="text-cyan-400" />
+                  <span>PAT. #ADEM-2026-X1</span>
+                </button>
               </div>
               <span className="text-[9.5px] text-[var(--muted)] font-medium">
                 {isAr ? 'هندسة وبرمجة: adem feidat' : 'Engineered by adem feidat'}
               </span>
             </div>
-          </button>
+          </div>
         </div>
 
         {/* Center Section: Responsive Executive Studio Switcher */}
@@ -621,6 +637,13 @@ export function AppShell({
       <LiveVoiceModal
         isOpen={isLiveVoiceOpen}
         onClose={() => setIsLiveVoiceOpen(false)}
+        language={language}
+      />
+
+      {/* Cyber-Patent Official Dossier Modal */}
+      <PatentDossierModal
+        isOpen={isPatentModalOpen}
+        onClose={() => setIsPatentModalOpen(false)}
         language={language}
       />
     </div>

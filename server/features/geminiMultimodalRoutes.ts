@@ -47,8 +47,9 @@ async function handleVeoGenerate(req: express.Request, res: express.Response) {
       });
     }
 
+    const targetVideoModel = 'veo-3.1-generate-preview';
     const payload: any = {
-      model: 'veo-3.1-fast-generate-preview',
+      model: targetVideoModel,
       config: {
         numberOfVideos: 1,
         resolution: '720p',
@@ -73,11 +74,18 @@ async function handleVeoGenerate(req: express.Request, res: express.Response) {
       });
     }
 
-    const operation = await ai.models.generateVideos(payload);
+    let operation;
+    let usedModel = targetVideoModel;
+    try {
+      operation = await ai.models.generateVideos(payload);
+    } catch {
+      usedModel = 'veo-3.1-lite-generate-preview';
+      operation = await ai.models.generateVideos({ ...payload, model: usedModel });
+    }
 
     return res.json({
       ok: true,
-      model: 'veo-3.1-fast-generate-preview',
+      model: usedModel,
       aspectRatio: validAspectRatio,
       operationName: operation.name,
       hasImageInput: Boolean(payload.image),
@@ -606,7 +614,7 @@ router.post('/grounding/maps', chatRateLimiter.middleware(), async (req: express
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.8-flash',
       contents: prompt,
       config,
     });
@@ -644,7 +652,7 @@ router.post('/grounding/maps', chatRateLimiter.middleware(), async (req: express
 
     return res.json({
       ok: true,
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.8-flash',
       tool: 'googleMaps',
       text,
       places,

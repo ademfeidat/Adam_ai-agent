@@ -58,7 +58,7 @@ process.on('unhandledRejection', (reason: any) => {
 const app = express();
 const requestedPort = Number(process.env.PORT);
 const port = (!isNaN(requestedPort) && requestedPort !== 8080 && requestedPort > 0) ? requestedPort : 3000;
-const model = process.env.ADAM_GEMINI_MODEL ?? 'gemini-2.5-flash';
+const model = process.env.ADAM_GEMINI_MODEL ?? 'gemini-3.8-flash';
 const apiKey = secretsManager.getGeminiApiKey();
 const rootDir = process.cwd();
 const publicDir = path.join(rootDir, 'dist');
@@ -147,10 +147,11 @@ const overloadedModels = new Map<string, number>();
 
 function getHealthSortedModels(preferredModel: string): string[] {
   const defaults = [
-    'gemini-2.5-flash',
-    'gemini-3.1-flash-lite',
     'gemini-3.8-flash',
+    'gemini-4-argon',
     'gemini-flash-latest',
+    'gemini-3.1-flash-lite',
+    'gemini-2.5-flash',
     'gemini-2.5-pro',
   ];
   const all = Array.from(new Set([preferredModel, ...defaults].filter(Boolean)));
@@ -1405,6 +1406,7 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
       if (!permCheck.allowed) {
         safeWrite(res, { type: 'delta', text: permCheck.reason || 'Permission denied for image generation.' });
         safeWrite(res, { type: 'done' });
+        safeEnd(res);
         return;
       }
 
@@ -1443,12 +1445,14 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
       const outputText = `:::image-card\n${JSON.stringify(cardPayload)}\n:::\n\n![${title}](${imageUrl})\n\n${desc}${details}`;
       safeWrite(res, { type: 'delta', text: outputText });
       safeWrite(res, { type: 'done' });
+      safeEnd(res);
       return;
     } else if (isExplicitVideoRequest(userPrompt)) {
       const permCheck = AgentPermissionGuard.canExecuteTool('generate_video', req.user);
       if (!permCheck.allowed) {
         safeWrite(res, { type: 'delta', text: permCheck.reason || 'Permission denied for video generation.' });
         safeWrite(res, { type: 'done' });
+        safeEnd(res);
         return;
       }
 
@@ -1474,6 +1478,7 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
       const outputText = `![${title}](${videoUrl})\n\n${desc}${details}`;
       safeWrite(res, { type: 'delta', text: outputText });
       safeWrite(res, { type: 'done' });
+      safeEnd(res);
       return;
     }
 
@@ -2341,7 +2346,7 @@ ${text.slice(0, 10000)}
 """`;
 
     let responseText = '';
-    const modelsToTry = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    const modelsToTry = ['gemini-3.8-flash', 'gemini-4-argon', 'gemini-flash-latest', 'gemini-3.1-flash-lite', 'gemini-2.5-flash'];
 
     for (const m of modelsToTry) {
       try {

@@ -502,7 +502,17 @@ export function MessageBubble({
         {/* Clean, Ultra-Modern Assistant Answer Screen */}
         {assistant && (
           <div className="w-full text-start">
-            <div className="rounded-2xl sm:rounded-3xl bg-[var(--surface)]/75 border border-[var(--border)]/70 p-4 sm:p-5 sm:px-6 shadow-xs transition-all hover:border-[var(--border)]">
+            <div className="rounded-2xl sm:rounded-3xl patent-drafting-card p-4 sm:p-5 sm:px-6 shadow-xs transition-all">
+              {/* Patent Verified Badge Stamp */}
+              <div className="flex items-center justify-between border-b border-cyan-500/15 pb-2.5 mb-3 text-[10px] font-mono tracking-widest text-cyan-400/90 uppercase select-none">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                  {language === 'ar' ? 'معتمد رسمياً · براءة اختراع #ADEM-2026-X1' : 'OFFICIAL PATENT SPEC · PAT. #ADEM-2026-X1'}
+                </span>
+                <span className="px-1.5 py-0.5 rounded bg-cyan-950/60 border border-cyan-500/30 text-[9px] text-cyan-300">
+                  FIG. 1.0 VERIFIED
+                </span>
+              </div>
               {displayMarkdown ? (
                 <div className="message-content text-[15px] sm:text-[16px] leading-[1.8] text-[var(--text)] antialiased select-text">
                   <ReactMarkdown

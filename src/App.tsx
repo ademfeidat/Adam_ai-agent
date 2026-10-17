@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Component, ErrorInfo, ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { AppPreferences, Language, ViewId } from './core/domain';
 import { createNewConversation, loadPreferences, normalizePreferences, savePreferences } from './core/storage';
@@ -21,6 +21,66 @@ import { AuthModal } from './components/AuthModal';
 import { AgenticLogin } from './features/auth/AgenticLogin';
 import { openSafeExternalUrl, setupAndroidBackGuard } from './core/utils/mobileWebHandler';
 import { GenerationProvider } from './core/generation';
+
+interface EngineErrorBoundaryProps {
+  children: ReactNode;
+  language?: Language;
+}
+
+interface EngineErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class EngineErrorBoundary extends Component<EngineErrorBoundaryProps, EngineErrorBoundaryState> {
+  public state: EngineErrorBoundaryState = {
+    hasError: false,
+  };
+
+  public static getDerivedStateFromError(error: Error): EngineErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('[EngineErrorBoundary] Caught engine error:', error, errorInfo);
+  }
+
+  public render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6 font-mono select-none">
+          <div className="max-w-md w-full bg-slate-900/90 border border-cyan-500/40 rounded-3xl p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-3 h-3 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-xs uppercase tracking-widest text-cyan-400 font-bold">ADEM Engine Self-Healing Protection</span>
+            </div>
+            <h2 className="text-xl font-bold mb-2 text-cyan-200">تم تفعيل التعافي الذاتي للمحرك</h2>
+            <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+              حدث خطأ مؤقت في تشغيل أحد محركات النظام. تم منع الانهيار بنجاح عبر بروتوكول التعافي الذاتي والاستقرار اللحظي.
+            </p>
+            {this.state.error && (
+              <div className="bg-slate-950/80 p-3 rounded-xl border border-red-500/20 text-xs text-red-400 mb-6 font-mono overflow-x-auto max-h-32">
+                {this.state.error.message}
+              </div>
+            )}
+            <button
+              onClick={() => {
+                localStorage.removeItem('adam_cache_lock');
+                window.location.reload();
+              }}
+              className="w-full py-3 px-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-2xl transition-all shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <span>إعادة ضبط وتشغيل المحرك (Engine Reboot)</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 const DEFAULT_PREFERENCES: AppPreferences = {
   agentName: 'Adam',
@@ -174,7 +234,8 @@ export default function App() {
   }
 
   return (
-    <GenerationProvider>
+    <EngineErrorBoundary language={preferences.language}>
+      <GenerationProvider>
       <AppShell
         activeView={activeView}
         language={preferences.language}
@@ -313,5 +374,6 @@ export default function App() {
         )}
       </AppShell>
     </GenerationProvider>
+    </EngineErrorBoundary>
   );
 }

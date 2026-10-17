@@ -677,11 +677,12 @@ function createGeminiInvoker(apiKey: string, language: 'ar' | 'en', agentName: s
       : [{ role: 'user' as const, parts: [{ text: promptText }] }];
 
     const modelVariants = [
-      'gemini-2.5-flash',
-      'gemini-3.1-flash-lite',
       'gemini-3.8-flash',
+      'gemini-4-argon',
       'gemini-flash-latest',
+      'gemini-3.1-flash-lite',
       modelDesc.id,
+      'gemini-2.5-flash',
       'gemini-2.5-pro',
     ];
     const uniqueModels = [...new Set(modelVariants.filter(Boolean))];
@@ -896,9 +897,9 @@ function createGeminiInvoker(apiKey: string, language: 'ar' | 'en', agentName: s
     // Direct string prompt fallback
     try {
       const resp = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite',
+        model: 'gemini-3.8-flash',
         contents: promptText,
-        config: buildGenerationConfig(baseConfig, 'gemini-3.1-flash-lite'),
+        config: buildGenerationConfig(baseConfig, 'gemini-3.8-flash'),
       });
       if (resp.text?.trim()) return resp.text.trim();
     } catch (e) {
