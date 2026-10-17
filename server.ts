@@ -148,10 +148,10 @@ const overloadedModels = new Map<string, number>();
 function getHealthSortedModels(preferredModel: string): string[] {
   const defaults = [
     'gemini-2.5-flash',
-    'gemini-2.5-pro',
-    'gemini-3.8-flash',
     'gemini-3.1-flash-lite',
+    'gemini-3.8-flash',
     'gemini-flash-latest',
+    'gemini-2.5-pro',
   ];
   const all = Array.from(new Set([preferredModel, ...defaults].filter(Boolean)));
   const now = Date.now();
@@ -283,7 +283,7 @@ function normalizeMessages(input: unknown) {
     });
 }
 
-import { getDynamicSystemContext, extractGroundingMetadata, mergeGroundingData, buildSecureImageUrl, buildFluxEngineUrl, isTodayDateQuery, fetchLiveWebKnowledge, type GroundingData, type GroundingSource } from './server/grounding';
+import { getDynamicSystemContext, extractGroundingMetadata, mergeGroundingData, buildSecureImageUrl, buildFluxEngineUrl, isTodayDateQuery, isConversationalQuery, fetchLiveWebKnowledge, type GroundingData, type GroundingSource } from './server/grounding';
 import { searchInternetImages } from './server/webImageSearch';
 
 export const GENERATE_SPECIALIZED_IMAGE_TOOL = {
@@ -1313,16 +1313,14 @@ ${recent}
 
 function getReasoningProfile(prompt: string, messageCount: number) {
   const p = prompt.trim();
-  const complex =
-    p.length > 900 ||
-    messageCount > 10 ||
-    /(?:debug|architect|architecture|refactor|implement|build|design|analy[sz]e|compare|research|prove|derive|algorithm|database|security|performance|migration|deploy|أصلح|صحح|طوّر|طور|برمج|كود|حل|حلل|قارن|ابحث|بحث|دقق|برهان|اشتق|خوارزم|قاعدة بيانات|أمان|أداء|هجرة|نشر)/i.test(p);
   const veryComplex =
-    p.length > 2200 ||
-    /(?:step by step|multi[- ]step|deep reasoning|root cause|comprehensive|end to end|من الصفر|بالتفصيل|بشكل شامل|السبب الجذري|خطوة بخطوة|حل كامل|مشروع كامل)/i.test(p);
+    p.length > 2500 ||
+    /(?:deep reasoning|برهان رياضي معقد|root cause analysis)/i.test(p);
+  const complex =
+    !veryComplex && (p.length > 1400 || /(?:refactor entire architecture|مشروع كامل من الصفر)/i.test(p));
 
-  if (veryComplex) return { thinkingLevel: 'high', maxOutputTokens: 12288, mode: 'deep' as const };
-  if (complex) return { thinkingLevel: 'medium', maxOutputTokens: 8192, mode: 'reasoning' as const };
+  if (veryComplex) return { thinkingLevel: 'low', maxOutputTokens: 8192, mode: 'deep' as const };
+  if (complex) return { thinkingLevel: 'low', maxOutputTokens: 6144, mode: 'reasoning' as const };
   return { thinkingLevel: 'low', maxOutputTokens: 4096, mode: 'fast' as const };
 }
 
@@ -1503,9 +1501,10 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
 
     const isToday = isTodayDateQuery(userPrompt);
 
-    // Fetch live web knowledge and internet facts to ensure answers are grounded with accurate and fresh information
+    // Fetch live web knowledge only when specifically needed for real-time external data (to keep response TTFT under 300ms)
     let webGrounding: { sources: GroundingSource[]; knowledgeContext: string; queries: string[] } = { sources: [], knowledgeContext: '', queries: [] };
-    if (!isToday && userPrompt.trim().length > 1) {
+    const needsWebSearch = !isToday && !isConversationalQuery(userPrompt) && /(?:أخبار|اخبار|سعر|أسعار|الطقس|طقس|ابحث عن|بحث عن|من هو|من هي|نتائج|ترتيب|مباراة|مباريات|عملة|سهم|أسهم|latest|news|weather|price|search|current|today's|who is|stock|crypto)/i.test(userPrompt);
+    if (needsWebSearch) {
       try {
         webGrounding = await fetchLiveWebKnowledge(userPrompt, language);
       } catch {
@@ -1546,10 +1545,10 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
 
     const candidateModels = getHealthSortedModels(model);
     let output = '';
-    const streamModelOutput = reasoningProfile.mode === 'fast';
+    const streamModelOutput = true;
     const emitModelText = (text: string) => {
       output += text;
-      if (streamModelOutput) safeWrite(res, { type: 'delta', text });
+      safeWrite(res, { type: 'delta', text });
     };
     let lastError: any = null;
     let accumulatedGrounding: GroundingData = isToday

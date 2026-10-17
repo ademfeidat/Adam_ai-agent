@@ -633,7 +633,8 @@ function createGeminiInvoker(apiKey: string, language: 'ar' | 'en', agentName: s
     // Supplementary web knowledge is only fetched if native search is unavailable.
     let webGrounding: { sources: GroundingSource[]; knowledgeContext: string; queries: string[] } = { sources: [], knowledgeContext: '', queries: [] };
     const canTryNativeSearch = useSearch && searchCircuitBreaker.isAvailable() && !isToday;
-    if (!isToday && !canTryNativeSearch && useSearch) {
+    const needsWebSearch = useSearch && !isToday && !canTryNativeSearch && !isConversationalQuery(promptText) && /(?:أخبار|اخبار|سعر|أسعار|الطقس|طقس|ابحث عن|بحث عن|من هو|من هي|نتائج|ترتيب|مباراة|مباريات|عملة|سهم|أسهم|latest|news|weather|price|search|current|today's|who is|stock|crypto)/i.test(promptText);
+    if (needsWebSearch) {
       try {
         webGrounding = await fetchLiveWebKnowledge(promptText, language);
       } catch {
@@ -656,21 +657,18 @@ function createGeminiInvoker(apiKey: string, language: 'ar' | 'en', agentName: s
       augmentedSystem += `\n${webGrounding.knowledgeContext}`;
     }
 
-    const isDeep = promptText.length > 2200 || /(?:step by step|deep reasoning|root cause|comprehensive|end to end|من الصفر|بالتفصيل الممل|السبب الجذري|مشروع كامل من الصفر)/i.test(promptText);
-    const isComplex = !isDeep && (promptText.length > 1500 || /(?:deep architect|deep refactor|prove mathematically|برهان رياضي معقد)/i.test(promptText));
-    // Default to 'low' thinkingLevel for lightning-fast sub-second latency (< 1s)
-    const thinkingLevel = isDeep ? 'high' : isComplex ? 'medium' : 'low';
+    const isDeep = promptText.length > 2500 || /(?:deep reasoning|برهان رياضي معقد)/i.test(promptText);
+    // Force 'low' thinkingLevel for lightning-fast instant responses (< 300ms TTFT)
+    const thinkingLevel = 'low';
     const baseConfig: any = {
-      temperature: req.temperature ?? (isDeep ? 0.20 : isComplex ? 0.22 : 0.28),
-      topP: isDeep ? 0.88 : 0.90,
-      maxOutputTokens: req.maxTokens ?? (isDeep ? 12288 : isComplex ? 8192 : 4096),
+      temperature: req.temperature ?? (isDeep ? 0.20 : 0.28),
+      topP: 0.90,
+      maxOutputTokens: req.maxTokens ?? (isDeep ? 8192 : 4096),
       thinkingConfig: { thinkingLevel },
       systemInstruction: augmentedSystem + (
         isDeep
           ? '\n\nRESPONSE MODE: DEEP. Reason carefully, verify assumptions and edge cases, then provide the finished answer without exposing private chain-of-thought.'
-          : isComplex
-            ? '\n\nRESPONSE MODE: REASONING. Solve carefully and verify important assumptions, but keep the final answer practical and focused.'
-            : '\n\nRESPONSE MODE: FAST. Answer directly, accurately, and simply.'
+          : '\n\nRESPONSE MODE: FAST. Answer directly, accurately, and simply.'
       ),
     };
 
@@ -680,11 +678,11 @@ function createGeminiInvoker(apiKey: string, language: 'ar' | 'en', agentName: s
 
     const modelVariants = [
       'gemini-2.5-flash',
-      'gemini-2.5-pro',
+      'gemini-3.1-flash-lite',
+      'gemini-3.8-flash',
       'gemini-flash-latest',
       modelDesc.id,
-      'gemini-3.8-flash',
-      'gemini-3.1-flash-lite',
+      'gemini-2.5-pro',
     ];
     const uniqueModels = [...new Set(modelVariants.filter(Boolean))];
 
