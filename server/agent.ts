@@ -712,11 +712,12 @@ function createGeminiInvoker(apiKey: string, language: 'ar' | 'en', agentName: s
             const actionParts: any[] = [];
             for (const fn of fnCalls) {
               const permCheck = AgentPermissionGuard.canExecuteTool(fn.name, user, { resource: fn.name });
-              if (!permCheck.allowed || !userId) {
-                actionParts.push({ functionResponse: { name: fn.name, response: { ok: false, error: permCheck.allowed ? 'AUTH_REQUIRED' : 'PERMISSION_DENIED', message: permCheck.reason } } });
+              if (!permCheck.allowed) {
+                actionParts.push({ functionResponse: { name: fn.name, response: { ok: false, error: 'PERMISSION_DENIED', message: permCheck.reason } } });
                 continue;
               }
-              const result = await executeAgentActionTool(fn.name, (fn.args ?? {}) as Record<string, unknown>, userId);
+              const effectiveUserId = userId || user?.uid || 'guest_user';
+              const result = await executeAgentActionTool(fn.name, (fn.args ?? {}) as Record<string, unknown>, effectiveUserId);
               actionParts.push({ functionResponse: { name: fn.name, response: result } });
 
               // Attach formatted visual cards for the UI

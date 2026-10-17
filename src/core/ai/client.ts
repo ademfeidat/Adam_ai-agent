@@ -108,7 +108,7 @@ async function streamRequestOnce(
   const startupTimeoutId = setTimeout(() => {
     startupTimedOut = true;
     requestController.abort();
-  }, 25_000);
+  }, 90_000);
 
   let response: Response;
   try {

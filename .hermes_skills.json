@@ -29,8 +29,8 @@
         "Provide clear, educational, step-by-step root-cause diagnostics."
       ],
       "acquiredAt": 1783471481389,
-      "lastUsedAt": 1792021481389,
-      "usageCount": 47,
+      "lastUsedAt": 1792273863995,
+      "usageCount": 53,
       "successRate": 0.99,
       "level": 10,
       "origin": "builtin"
@@ -99,8 +99,8 @@
         "Provide clear, educational, step-by-step root-cause diagnostics."
       ],
       "acquiredAt": 1783644281389,
-      "lastUsedAt": 1792014281389,
-      "usageCount": 61,
+      "lastUsedAt": 1792273863995,
+      "usageCount": 65,
       "successRate": 0.99,
       "level": 10,
       "origin": "builtin"
@@ -36799,8 +36799,92 @@
       "successRate": 0.99,
       "level": 10,
       "origin": "builtin"
+    },
+    {
+      "id": "skill_auto_b3a43056",
+      "name": "Dynamic Heuristic (لعبة سيارات سباق تنافسية)",
+      "displayNameAr": "مهارة مكتسبة تلقائياً: لعبة سيارات سباق تنافسية",
+      "category": "ui",
+      "description": "Autonomous skill synthesized by Hermes Agent for recurring task pattern \"لعبة سيارات سباق تنافسية\".",
+      "triggers": [
+        "لعبة",
+        "سيارات",
+        "سباق",
+        "تنافسية"
+      ],
+      "proceduralSteps": [
+        "Identify specific constraints matching [لعبة, سيارات, سباق, تنافسية]",
+        "Formulate deterministic verification and deliver modular output",
+        "Verify edge cases and user constraints iteratively"
+      ],
+      "bestPractices": [
+        "Maintain high consistency with previous successful completions",
+        "Refine answer quality based on user context"
+      ],
+      "acquiredAt": 1792268824557,
+      "lastUsedAt": 1792272621714,
+      "usageCount": 4,
+      "successRate": 0.95,
+      "level": 1,
+      "origin": "autonomous_learned"
+    },
+    {
+      "id": "skill_auto_4ba4d4b2",
+      "name": "Dynamic Heuristic (خلي العبة بلغة java)",
+      "displayNameAr": "مهارة مكتسبة تلقائياً: خلي العبة بلغة java",
+      "category": "coding",
+      "description": "Autonomous skill synthesized by Hermes Agent for recurring task pattern \"خلي العبة بلغة java\".",
+      "triggers": [
+        "خلي",
+        "العبة",
+        "بلغة",
+        "java"
+      ],
+      "proceduralSteps": [
+        "Identify specific constraints matching [خلي, العبة, بلغة, java]",
+        "Formulate deterministic verification and deliver modular output",
+        "Verify edge cases and user constraints iteratively"
+      ],
+      "bestPractices": [
+        "Maintain high consistency with previous successful completions",
+        "Refine answer quality based on user context"
+      ],
+      "acquiredAt": 1792269741514,
+      "lastUsedAt": 1792269741514,
+      "usageCount": 1,
+      "successRate": 0.95,
+      "level": 1,
+      "origin": "autonomous_learned"
+    },
+    {
+      "id": "skill_auto_9887a440",
+      "name": "Dynamic Heuristic (شغلوا محرك الالعاب هنا)",
+      "displayNameAr": "مهارة مكتسبة تلقائياً: شغلوا محرك الالعاب هنا",
+      "category": "ui",
+      "description": "Autonomous skill synthesized by Hermes Agent for recurring task pattern \"شغلوا محرك الالعاب هنا\".",
+      "triggers": [
+        "شغلوا",
+        "محرك",
+        "الالعاب",
+        "هنا"
+      ],
+      "proceduralSteps": [
+        "Identify specific constraints matching [شغلوا, محرك, الالعاب, هنا]",
+        "Formulate deterministic verification and deliver modular output",
+        "Verify edge cases and user constraints iteratively"
+      ],
+      "bestPractices": [
+        "Maintain high consistency with previous successful completions",
+        "Refine answer quality based on user context"
+      ],
+      "acquiredAt": 1792269800133,
+      "lastUsedAt": 1792269800133,
+      "usageCount": 1,
+      "successRate": 0.95,
+      "level": 1,
+      "origin": "autonomous_learned"
     }
   ],
-  "totalExecutions": 8420,
-  "lastSavedAt": 1792025081394
+  "totalExecutions": 8426,
+  "lastSavedAt": 1792273863995
 }

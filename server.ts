@@ -233,13 +233,31 @@ function normalizeMessages(input: unknown) {
       list = [{ role: 'user', content: obj.message, images: obj.images }];
     } else if (typeof obj.prompt === 'string') {
       list = [{ role: 'user', content: obj.prompt, images: obj.images }];
+    } else if (Array.isArray(obj.parts)) {
+      list = [obj];
     }
   }
   if (!list.length) return [];
-  const valid = list
-    .filter((item): item is { role: string; content: string; images?: string[] } =>
-      Boolean(item && typeof item === 'object' && typeof (item as any).content === 'string')
-    );
+
+  const valid: Array<{ role: string; content: string; images?: string[] }> = [];
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue;
+    let content = '';
+    if (typeof item.content === 'string') {
+      content = item.content;
+    } else if (typeof item.text === 'string') {
+      content = item.text;
+    } else if (Array.isArray(item.parts)) {
+      content = item.parts.map((p: any) => p?.text || '').filter(Boolean).join(' ');
+    }
+    if (content.trim()) {
+      valid.push({
+        role: item.role || 'user',
+        content,
+        images: Array.isArray(item.images) ? item.images : undefined,
+      });
+    }
+  }
 
   // Long-context policy: preserve the opening context and the latest turns while
   // enforcing a predictable server-side budget. Gemini 3.8 Flash supports a 1M
@@ -797,22 +815,25 @@ app.get('/api/security/metrics', requirePermission('admin:read_metrics'), (_req,
 app.get('/api/security/audit-logs', (req, res) => {
   const isAdmin = req.user?.role === 'admin';
   const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const uid = req.user?.uid || 'guest_user';
   const logs = auditLogger.getEvents({
     limit,
-    userId: isAdmin ? undefined : req.user.uid,
+    userId: isAdmin ? undefined : uid,
   });
   res.json({ ok: true, logs });
 });
 
 // Security: Budget & Cost Controls (P2 Cost controls)
 app.get('/api/security/budget', (req, res) => {
-  const status = costControlManager.getBudgetStatus(req.user.uid);
+  const uid = req.user?.uid || 'guest_user';
+  const status = costControlManager.getBudgetStatus(uid);
   res.json({ ok: true, budget: status });
 });
 
 // Security: Human Approval Gatekeeper (P0 Human approval)
 app.get('/api/security/approvals', (req, res) => {
-  const pending = humanApprovalManager.getPendingForUser(req.user.uid);
+  const uid = req.user?.uid || 'guest_user';
+  const pending = humanApprovalManager.getPendingForUser(uid);
   res.json({ ok: true, pending });
 });
 
@@ -821,9 +842,10 @@ app.post('/api/security/approvals/:id/resolve', requirePermission('system:approv
   if (decision !== 'approved' && decision !== 'rejected') {
     return res.status(400).json({ ok: false, error: 'Invalid decision' });
   }
+  const uid = req.user?.uid || 'guest_user';
   const result = humanApprovalManager.resolveApproval(
     req.params.id,
-    req.user.uid,
+    uid,
     decision === 'approved' ? 'APPROVED' : 'REJECTED',
     req.ip
   );
@@ -832,7 +854,8 @@ app.post('/api/security/approvals/:id/resolve', requirePermission('system:approv
 
 // Security: Long-Term Isolated Memory (P2 Better memory)
 app.get('/api/memories', (req, res) => {
-  const memories = BetterMemoryEngine.getUserMemories(req.user.uid);
+  const uid = req.user?.uid || 'guest_user';
+  const memories = BetterMemoryEngine.getUserMemories(uid);
   res.json({ ok: true, memories });
 });
 
@@ -841,8 +864,9 @@ app.post('/api/memories', (req, res) => {
   if (!text || typeof text !== 'string') {
     return res.status(400).json({ ok: false, error: 'Memory text is required' });
   }
+  const uid = req.user?.uid || 'guest_user';
   const memory = BetterMemoryEngine.addMemory(
-    req.user.uid,
+    uid,
     category || 'general',
     text.slice(0, 500),
     Number(importance) || 3
@@ -851,18 +875,21 @@ app.post('/api/memories', (req, res) => {
 });
 
 app.delete('/api/memories/:id', (req, res) => {
-  const success = BetterMemoryEngine.deleteMemory(req.user.uid, req.params.id);
+  const uid = req.user?.uid || 'guest_user';
+  const success = BetterMemoryEngine.deleteMemory(uid, req.params.id);
   res.json({ ok: success });
 });
 
 // Security: Background Tasks (P2 Background tasks)
 app.get('/api/tasks', (req, res) => {
-  const tasks = backgroundTaskQueue.getUserTasks(req.user.uid);
+  const uid = req.user?.uid || 'guest_user';
+  const tasks = backgroundTaskQueue.getUserTasks(uid);
   res.json({ ok: true, tasks });
 });
 
 app.post('/api/tasks/:id/cancel', (req, res) => {
-  const success = backgroundTaskQueue.cancelTask(req.params.id, req.user.uid);
+  const uid = req.user?.uid || 'guest_user';
+  const success = backgroundTaskQueue.cancelTask(req.params.id, uid);
   res.json({ ok: success });
 });
 
@@ -988,7 +1015,8 @@ app.post('/api/media/generate-image', mediaRateLimiter.middleware(), async (req,
     }
 
     // P2 Cost Controls Check
-    const budgetCheck = costControlManager.checkBudget(req.user.uid, true);
+    const effectiveUid = req.user?.uid || 'guest_user';
+    const budgetCheck = costControlManager.checkBudget(effectiveUid, true);
     if (!budgetCheck.allowed) {
       return res.status(429).json({ ok: false, error: budgetCheck.reason });
     }
@@ -1004,13 +1032,13 @@ app.post('/api/media/generate-image', mediaRateLimiter.middleware(), async (req,
       characterAnchor,
       customNegativePrompt,
       apiKey,
-      userId: req.user.uid,
+      userId: effectiveUid,
     });
 
-    costControlManager.recordUsage(req.user.uid, 50, true);
+    costControlManager.recordUsage(effectiveUid, 50, true);
 
     auditLogger.log({
-      userId: req.user.uid,
+      userId: effectiveUid,
       ip: req.ip,
       action: 'GENERATE_IMAGE',
       resource: item.id,
@@ -1037,7 +1065,8 @@ app.post('/api/media/generate-vector', mediaRateLimiter.middleware(), async (req
       return res.status(403).json({ ok: false, error: permCheck.reason });
     }
 
-    const budgetCheck = costControlManager.checkBudget(req.user.uid, true);
+    const effectiveUid = req.user?.uid || 'guest_user';
+    const budgetCheck = costControlManager.checkBudget(effectiveUid, true);
     if (!budgetCheck.allowed) {
       return res.status(429).json({ ok: false, error: budgetCheck.reason });
     }
@@ -1046,13 +1075,13 @@ app.post('/api/media/generate-vector', mediaRateLimiter.middleware(), async (req
       prompt: prompt.slice(0, 800),
       style,
       apiKey,
-      userId: req.user.uid,
+      userId: effectiveUid,
     });
 
-    costControlManager.recordUsage(req.user.uid, 30, true);
+    costControlManager.recordUsage(effectiveUid, 30, true);
 
     auditLogger.log({
-      userId: req.user.uid,
+      userId: effectiveUid,
       ip: req.ip,
       action: 'GENERATE_VECTOR_SVG',
       resource: item.id,
@@ -1079,7 +1108,8 @@ app.post('/api/media/generate-video', mediaRateLimiter.middleware(), async (req,
       return res.status(403).json({ ok: false, error: permCheck.reason });
     }
 
-    const budgetCheck = costControlManager.checkBudget(req.user.uid, true);
+    const effectiveUid = req.user?.uid || 'guest_user';
+    const budgetCheck = costControlManager.checkBudget(effectiveUid, true);
     if (!budgetCheck.allowed) {
       return res.status(429).json({ ok: false, error: budgetCheck.reason });
     }
@@ -1093,10 +1123,10 @@ app.post('/api/media/generate-video', mediaRateLimiter.middleware(), async (req,
       fps,
       seed,
       apiKey,
-      userId: req.user.uid,
+      userId: effectiveUid,
     });
 
-    costControlManager.recordUsage(req.user.uid, 100, true);
+    costControlManager.recordUsage(effectiveUid, 100, true);
 
     res.json({ ok: true, item });
   } catch (err: any) {
@@ -1148,7 +1178,8 @@ app.post('/api/media/image-to-image', mediaRateLimiter.middleware(), async (req,
       return res.status(400).json({ ok: false, error: 'Prompt and sourceImage are required' });
     }
 
-    const budgetCheck = costControlManager.checkBudget(req.user.uid, true);
+    const effectiveUid = req.user?.uid || 'guest_user';
+    const budgetCheck = costControlManager.checkBudget(effectiveUid, true);
     if (!budgetCheck.allowed) {
       return res.status(429).json({ ok: false, error: budgetCheck.reason });
     }
@@ -1160,10 +1191,10 @@ app.post('/api/media/image-to-image', mediaRateLimiter.middleware(), async (req,
       aspectRatio,
       seed,
       apiKey,
-      userId: req.user.uid,
+      userId: effectiveUid,
     });
 
-    costControlManager.recordUsage(req.user.uid, 60, true);
+    costControlManager.recordUsage(effectiveUid, 60, true);
 
     res.json({ ok: true, item });
   } catch (err: any) {
