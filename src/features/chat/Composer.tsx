@@ -12,6 +12,11 @@ import {
   Unlock,
   UploadCloud,
   X,
+  Code,
+  Film,
+  Gamepad2,
+  Languages,
+  Terminal,
 } from 'lucide-react';
 import { useRef, useState, useEffect } from 'react';
 import { copy } from '../../core/i18n';
@@ -700,6 +705,80 @@ export function Composer({
           </button>
         </div>
       )}
+
+      {/* Quick Action Tools Strip (All-in-One Chat Execution) */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 scrollbar-none select-none w-full">
+        {[
+          {
+            icon: Film,
+            labelAr: 'وسائط 8K وفيديو',
+            labelEn: '8K Media & Veo',
+            color: 'text-amber-400',
+            promptAr: 'أنشئ صورة فائقة الدقة 8K لمشهد سينمائي واقعي مذهل: ',
+            promptEn: 'Generate an 8K photorealistic cinematic visual with volumetric lighting: ',
+          },
+          {
+            icon: Code,
+            labelAr: 'تطبيق ساندبوكس',
+            labelEn: 'Sandbox App',
+            color: 'text-emerald-400',
+            promptAr: 'برمج لي تطبيق ويب تفاعلي كامل بنسبة 100% مع واجهة متطورة: ',
+            promptEn: 'Build a complete interactive web application with real state and clean UI: ',
+          },
+          {
+            icon: Languages,
+            labelAr: 'ترجمة فورية',
+            labelEn: 'Neural Translate',
+            color: 'text-purple-400',
+            promptAr: 'ترجم النص التالي بدقة فائقة مع مراعاة المعنى والسياق: ',
+            promptEn: 'Translate the following text accurately preserving context and tone: ',
+          },
+          {
+            icon: Gamepad2,
+            labelAr: 'لعبة 3D تفاعلية',
+            labelEn: '3D WebGL Game',
+            color: 'text-rose-400',
+            promptAr: 'برمج لي لعبة ثلاثية الأبعاد 3D تفاعلية وممتعة قابلة للعب فوراً: ',
+            promptEn: 'Create a complete playable 3D WebGL game with physics and sound FX: ',
+          },
+          {
+            icon: Terminal,
+            labelAr: 'أمر طرفية ونظام',
+            labelEn: 'Terminal / Linux',
+            color: 'text-cyan-400',
+            promptAr: 'نفذ أمر الطرفية التالي وتحقق من المخرجات: ',
+            promptEn: 'Execute the following system terminal command and verify output: ',
+          },
+          {
+            icon: Globe,
+            labelAr: 'بحث حي ومصادر',
+            labelEn: 'Live Search',
+            color: 'text-blue-400',
+            promptAr: 'ابحث في الإنترنت عن آخر المعلومات المحدثة اليوم مع المصادر: ',
+            promptEn: 'Search the live web for verified up-to-date sources on: ',
+          },
+        ].map((tool, idx) => {
+          const Icon = tool.icon;
+          return (
+            <button
+              key={idx}
+              type="button"
+              disabled={isLocked}
+              onClick={() => {
+                const prefix = isAr ? tool.promptAr : tool.promptEn;
+                setDraft((prev) => (prev ? `${prev} ${prefix}` : prefix));
+                if (textareaRef.current) {
+                  textareaRef.current.focus();
+                }
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[var(--surface-2)]/80 hover:bg-[var(--surface-hover)] border border-[var(--border)] hover:border-[var(--accent)]/40 text-[11px] font-semibold text-[var(--muted)] hover:text-[var(--text)] transition-all cursor-pointer shrink-0 shadow-2xs active:scale-95 disabled:opacity-50"
+            >
+              <Icon size={12} className={tool.color} />
+              <span className="whitespace-nowrap">{isAr ? tool.labelAr : tool.labelEn}</span>
+            </button>
+          );
+        })}
+      </div>
 
       {/* Main Luxury Streamlined Composer Box */}
       <div className={`composer flex items-end gap-1.5 p-1.5 sm:p-2 rounded-2xl sm:rounded-3xl bg-[var(--surface)]/95 border border-[var(--border-strong)] shadow-xl backdrop-blur-2xl transition-all duration-300 focus-within:border-[var(--accent)] focus-within:shadow-[0_0_24px_var(--accent-glow)] w-full ${isLocked ? 'ring-1 ring-amber-500/30' : ''}`}>

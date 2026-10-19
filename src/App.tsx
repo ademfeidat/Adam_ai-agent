@@ -5,13 +5,6 @@ import { createNewConversation, loadPreferences, normalizePreferences, savePrefe
 import { AppShell } from './components/AppShell';
 import { Chat } from './features/chat/Chat';
 import { Settings } from './features/settings/Settings';
-import { AppSandboxStudio } from './features/sandbox/AppSandboxStudio';
-import { TranslatorStudio } from './features/translation/TranslatorStudio';
-import { GoogleAdkStudio } from './features/adk/GoogleAdkStudio';
-import { MediaStudio } from './features/media/MediaStudio';
-import { GitHubStudio } from './features/github/GitHubStudio';
-import { ThreeJsGameStudio } from './features/game/ThreeJsGameStudio';
-import { VercelDiagnosticsView } from './features/diagnostics/VercelDiagnosticsView';
 import { BackgroundSecuritySentinel } from './components/BackgroundSecuritySentinel';
 import { QuickLiquidRefraction } from './components/QuickLiquidRefraction';
 import { NetworkSentinel } from './components/NetworkSentinel';
@@ -123,7 +116,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    if ((activeView as string) === 'memory' || (activeView as string) === 'tasks') {
+    if (activeView !== 'chat' && activeView !== 'settings') {
       setActiveView('chat');
     }
   }, [activeView]);
@@ -274,87 +267,38 @@ export default function App() {
                 }
                 onOpenSandbox={(appId) => {
                   setSelectedSandboxAppId(appId);
-                  setActiveView('apps');
                 }}
                 onSessionMetaChange={handleSessionMetaChange}
-                onNavigateView={(view, extraParam) => {
-                  if (extraParam) {
-                    setSelectedSandboxAppId(extraParam);
+                onNavigateView={(view) => {
+                  if (view === 'settings') {
+                    setActiveView('settings');
                   }
-                  setActiveView(view);
                 }}
               />
             )}
 
             {activeView === 'settings' && (
-              <Settings
-                language={preferences.language}
-                preferences={preferences}
-                onChange={updatePreferences}
-              />
-            )}
-
-            {activeView === 'apps' && (
-              <AppSandboxStudio
-                language={preferences.language}
-                initialAppId={selectedSandboxAppId}
-                onNavigateToChat={(_prompt) => {
-                  setActiveView('chat');
-                }}
-                onNavigateToGame={() => {
-                  setActiveView('game');
-                }}
-              />
-            )}
-
-            {activeView === 'translate' && (
-              <TranslatorStudio
-                language={preferences.language}
-                onNavigateToChat={(_prompt) => {
-                  setActiveView('chat');
-                }}
-              />
-            )}
-
-            {activeView === 'adk' && (
-              <GoogleAdkStudio
-                language={preferences.language}
-                onNavigateToChat={(_prompt) => {
-                  setActiveView('chat');
-                }}
-              />
-            )}
-
-            {activeView === 'media' && (
-              <MediaStudio
-                language={preferences.language}
-                onNavigate={(view) => setActiveView(view)}
-                onRunPromptInChat={(_prompt) => {
-                  setActiveView('chat');
-                }}
-              />
-            )}
-
-            {activeView === 'github' && (
-              <GitHubStudio
-                language={preferences.language}
-                onNavigateToChat={(_prompt) => {
-                  setActiveView('chat');
-                }}
-              />
-            )}
-
-            {activeView === 'game' && (
-              <ThreeJsGameStudio
-                language={preferences.language}
-                onBackToApps={() => setActiveView('apps')}
-              />
-            )}
-
-            {activeView === 'vercel' && (
-              <VercelDiagnosticsView
-                language={preferences.language}
-              />
+              <div className="flex-1 flex flex-col h-full overflow-hidden bg-[var(--surface)]">
+                <div className="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--surface-2)]/90 backdrop-blur-xl flex items-center justify-between z-10 shrink-0">
+                  <span className="text-xs font-bold text-[var(--text)]">
+                    {preferences.language === 'ar' ? 'إعدادات المنظومة والمظهر' : 'System Settings & Theme'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveView('chat')}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold shadow-xs hover:opacity-90 transition active:scale-95 cursor-pointer"
+                  >
+                    <span>{preferences.language === 'ar' ? 'العودة للمحادثة' : 'Back to Chat'}</span>
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  <Settings
+                    language={preferences.language}
+                    preferences={preferences}
+                    onChange={updatePreferences}
+                  />
+                </div>
+              </div>
             )}
           </motion.div>
         </AnimatePresence>

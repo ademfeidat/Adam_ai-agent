@@ -465,15 +465,21 @@ function generateWebGL3DSpaceGame(title: string, titleEn: string, userPrompt: st
     scene.fog = new THREE.FogExp2(0x020617, 0.015);
 
     const camera = new THREE.PerspectiveCamera(65, 1, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    let renderer = null;
+    try {
+      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      if (gl) {
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      }
+    } catch(e) {}
 
     function resize() {
-      const w = canvas.parentElement.clientWidth;
-      const h = canvas.parentElement.clientHeight;
+      const w = canvas.parentElement ? canvas.parentElement.clientWidth : window.innerWidth;
+      const h = canvas.parentElement ? canvas.parentElement.clientHeight : window.innerHeight;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
+      if (renderer) renderer.setSize(w, h);
     }
     window.addEventListener('resize', resize);
     resize();
@@ -664,7 +670,9 @@ function generateWebGL3DSpaceGame(title: string, titleEn: string, userPrompt: st
         starsGeo.attributes.position.needsUpdate = true;
       }
 
-      renderer.render(scene, camera);
+      if (renderer) {
+        renderer.render(scene, camera);
+      }
     }
     animate();
   </script>

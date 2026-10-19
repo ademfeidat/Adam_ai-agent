@@ -27,6 +27,29 @@ interface ThreeJsGameStudioProps {
   onBackToApps?: () => void;
 }
 
+function checkWebGLSupport(): boolean {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+  try {
+    const canvas = document.createElement('canvas');
+    const origError = console.error;
+    const origWarn = console.warn;
+    let gl: any = null;
+    try {
+      console.error = () => {};
+      console.warn = () => {};
+      gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    } catch {
+      return false;
+    } finally {
+      console.error = origError;
+      console.warn = origWarn;
+    }
+    return Boolean(gl);
+  } catch {
+    return false;
+  }
+}
+
 // ============================================================================
 // Procedural Web Audio Synthesizer (Zero External File Dependencies)
 // ============================================================================
@@ -550,22 +573,55 @@ export const ThreeJsGameStudio: React.FC<ThreeJsGameStudioProps> = ({ language, 
     let fallback2DCanvas: HTMLCanvasElement | null = null;
     let isFallbackMode = false;
 
-    try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-      renderer.setSize(container.clientWidth, container.clientHeight);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.15;
-      renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-      renderer.domElement.addEventListener('webglcontextlost', (e) => {
-        e.preventDefault();
-        console.warn('[ThreeJsGameStudio] WebGL Context Lost, handled gracefully without crashing.');
-      }, false);
-      container.appendChild(renderer.domElement);
-    } catch (glErr) {
-      console.warn('[ThreeJsGameStudio] WebGL context creation failed, falling back to high-performance 2D Canvas renderer:', glErr);
+    const hasWebGL = checkWebGLSupport();
+
+    if (hasWebGL) {
+      const origConsoleError = console.error;
+      const origConsoleWarn = console.warn;
+      try {
+        console.error = (...args: any[]) => {
+          const msg = typeof args[0] === 'string' ? args[0] : '';
+          if (
+            msg.includes('THREE.WebGLRenderer') ||
+            msg.includes('WebGL') ||
+            msg.includes('GL driver') ||
+            msg.includes('EGL_NO_CONFIG')
+          ) {
+            return;
+          }
+          origConsoleError.apply(console, args);
+        };
+        console.warn = (...args: any[]) => {
+          const msg = typeof args[0] === 'string' ? args[0] : '';
+          if (msg.includes('THREE.WebGLRenderer') || msg.includes('WebGL')) {
+            return;
+          }
+          origConsoleWarn.apply(console, args);
+        };
+
+        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'default' });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.15;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.domElement.addEventListener('webglcontextlost', (e) => {
+          e.preventDefault();
+        }, false);
+        container.appendChild(renderer.domElement);
+      } catch {
+        isFallbackMode = true;
+      } finally {
+        console.error = origConsoleError;
+        console.warn = origConsoleWarn;
+      }
+    } else {
+      isFallbackMode = true;
+    }
+
+    if (isFallbackMode || !renderer) {
       isFallbackMode = true;
       fallback2DCanvas = document.createElement('canvas');
       fallback2DCanvas.width = container.clientWidth || 800;
@@ -576,10 +632,14 @@ export const ThreeJsGameStudio: React.FC<ThreeJsGameStudioProps> = ({ language, 
     }
 
     if (!isFallbackMode && renderer) {
-      // Studio Environment Reflections via RoomEnvironment
-      const pmremGenerator = new THREE.PMREMGenerator(renderer);
-      scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
-      pmremGenerator.dispose();
+      try {
+        // Studio Environment Reflections via RoomEnvironment
+        const pmremGenerator = new THREE.PMREMGenerator(renderer);
+        scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+        pmremGenerator.dispose();
+      } catch {
+        // Handled silently
+      }
     }
 
     // Studio 3-Point Balanced Lighting

@@ -987,7 +987,7 @@ Provide exactly 5 distinct harmonious colors in the palette. Ensure scores are n
     if (params.apiKey) {
       try {
         const ai = new GoogleGenAI({ apiKey: params.apiKey });
-        const res = await ai.models.generateContent({
+        const generatePromise = ai.models.generateContent({
           model: 'gemini-3.8-flash',
           contents: [
             {
@@ -1009,10 +1009,14 @@ CRITICAL RULES:
           ],
         });
 
-        const text = res.text || '';
-        const match = text.match(/<svg[\s\S]*?<\/svg>/i);
-        if (match) {
-          svgCode = match[0];
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5500));
+        const res = await Promise.race([generatePromise, timeoutPromise]);
+        if (res && (res as any).text) {
+          const text = (res as any).text;
+          const match = text.match(/<svg[\s\S]*?<\/svg>/i);
+          if (match) {
+            svgCode = match[0];
+          }
         }
       } catch (svgErr) {
         console.warn('[MediaEngine] Gemini SVG generation error:', svgErr);

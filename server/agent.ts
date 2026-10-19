@@ -270,6 +270,18 @@ function buildIntentProtocol(prompt: string, history: Array<any>, language: 'ar'
 - Never state or imply that you were made, developed, or trained by Google or Gemini.`;
   }
 
+  const isSupercharge = /(?:قويها|قويها اكثر|قويها أكثر|قوة قصوى|اجعلها اقوى|ارفع قوتها|ارفع الأداء|supercharge|boost)/i.test(prompt);
+  if (isSupercharge) {
+    return language === 'ar'
+      ? `\n\n[بروتوكول القوة القصوى والسيادة التنفيذية المطلقة - TURBO TITAN MODE]:
+- المستخدم يأمر الآن برفع طاقة وأداء ADEM إلى أقصى درجات الذكاء والسرعة والاستقلالية عبر النطاقات الأربعة (النطاق A: الوسائط والفيديو 8K، النطاق B: الذكاء المكاني والخرائط، النطاق C: التفكير العميق والساندبوكس، النطاق D: التحكم الجذري بأنظمة لينكس وأندرويد).
+- استجب فوراً بإعلان تفعيل وضع القوة القصوى (ADEM Hyper-Executive Mode 4.0).
+- لا تسأل المستخدم أي أسئلة توضيحية روتينية، بل باشر فوراً في تقديم الحلول البرمجية الكاملة، وأوامر الطرفية والتشغيل المباشر بدون حشو إنشائي.`
+      : `\n\n[Supercharge Protocol Activated]:
+- Elevate ADEM operational power to maximum throughput across all 4 operational domains.
+- Deliver full system optimization, zero-fluff answers, and root-level scripts without generic questions.`;
+  }
+
   const isCasual = prompt.trim().length < 40 && /(?:أهلا|اهلا|مرحبا|مرحباً|سلام|كيف\s*حالك|كيفك|شلونك|واش\s*راك|وش\s*راك|لباس|لاباس|شكرا|شكراً|hello|hi|hey|how are you|thanks)/i.test(prompt);
   if (isCasual) {
     return '';
@@ -657,9 +669,8 @@ function createGeminiInvoker(apiKey: string, language: 'ar' | 'en', agentName: s
       augmentedSystem += `\n${webGrounding.knowledgeContext}`;
     }
 
-    const isDeep = promptText.length > 2500 || /(?:deep reasoning|برهان رياضي معقد)/i.test(promptText);
-    // Force 'low' thinkingLevel for lightning-fast instant responses (< 300ms TTFT)
-    const thinkingLevel = 'low';
+    const isDeep = promptText.length > 2500 || /(?:deep reasoning|برهان رياضي معقد|قويها|قوة قصوى|supercharge|حلل بعمق|فكر بعمق)/i.test(promptText);
+    const thinkingLevel = isDeep ? 'high' : 'low';
     const baseConfig: any = {
       temperature: req.temperature ?? (isDeep ? 0.20 : 0.28),
       topP: 0.90,
