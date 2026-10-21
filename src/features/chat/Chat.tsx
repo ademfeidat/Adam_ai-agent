@@ -907,60 +907,48 @@ export function Chat({
         )}
 
         {messages.length === 0 ? (
-          <div className="flex-1 my-auto max-w-2xl mx-auto px-4 py-8 sm:py-12 text-center flex flex-col items-center justify-center gap-5 sm:gap-6 animate-fadeIn select-none">
-            {/* Minimalist Emblem */}
-            <div className="flex flex-col items-center gap-2">
+          <div className="flex-1 my-auto max-w-2xl mx-auto px-4 py-8 sm:py-12 text-center flex flex-col items-center justify-center gap-6 animate-fadeIn select-none">
+            {/* Minimalist Emblem & Title */}
+            <div className="flex flex-col items-center gap-3">
               <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 via-blue-500/10 to-indigo-500/20 border border-cyan-500/30 text-[var(--accent)] flex items-center justify-center shadow-lg backdrop-blur-xl">
                 <Sparkles size={24} className="text-cyan-400" />
               </div>
-              <span className="text-xs font-mono text-[var(--muted)]">
-                {language === 'ar' ? 'ADEM AI • adem feidat' : 'ADEM AI • adem feidat'}
-              </span>
-            </div>
-
-            {/* Clean Welcoming Header */}
-            <div className="space-y-1">
               <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--text)] tracking-tight">
                 {language === 'ar' ? 'كيف يمكنني مساعدتك اليوم؟' : 'How can I help you today?'}
               </h1>
-              <p className="text-xs sm:text-sm text-[var(--muted)] max-w-md mx-auto">
-                {language === 'ar'
-                  ? 'اكتب طلبك مباشرة أو أرفق ملفات، صور، وأوامر برمجية لتحليلها فورياً.'
-                  : 'Type your prompt, attach files or images, or run live autonomous tasks.'}
-              </p>
             </div>
 
-            {/* 4 Compact, Fast-Action Prompt Pills */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg mt-2">
+            {/* 4 Compact Fast-Action Prompt Pills */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg mt-1">
               {[
                 {
                   icon: Globe,
-                  labelAr: 'بحث Google الحي والمصادر',
-                  labelEn: 'Live Google Search Grounding',
+                  labelAr: 'بحث Google المباشر',
+                  labelEn: 'Live Google Search',
                   promptAr: 'ما هي أحدث أخبار وتطورات اليوم مع المصادر المباشرة؟',
                   promptEn: 'What are today’s latest developments with verified web sources?',
                   color: 'text-cyan-400',
                 },
                 {
                   icon: Code,
-                  labelAr: 'برمجة تطبيق أو لعبة تفاعلية',
-                  labelEn: 'Build Interactive Web App',
+                  labelAr: 'برمجة تطبيق أو لعبة',
+                  labelEn: 'Build Web App or Game',
                   promptAr: 'برمج لي تطبيق ويب متجاوب وحديث بالكامل بنسبة 100% مع واجهة أنيقة',
                   promptEn: 'Write a complete responsive production-ready web application with real state',
                   color: 'text-purple-400',
                 },
                 {
                   icon: FileSearch,
-                  labelAr: 'دراسة وتحليل ملف أو كود',
-                  labelEn: 'Analyze & Study Document',
+                  labelAr: 'تحليل ملف أو كود',
+                  labelEn: 'Analyze Code or Document',
                   promptAr: 'حلل هذا الموضوع واشرح النقاط الجوهرية وقدم ملخصاً تطبيقياً دقيقاً',
                   promptEn: 'Analyze this subject and provide key takeaways with an actionable summary',
                   color: 'text-emerald-400',
                 },
                 {
                   icon: Film,
-                  labelAr: 'توليد صور سينمائية 8K',
-                  labelEn: 'Cinematic 8K Imagery',
+                  labelAr: 'توليد صور 8K',
+                  labelEn: 'Generate 8K Image',
                   promptAr: 'أنشئ صورة سينمائية فائقة الدقة 8K لمشهد مستقبلي مذهل بتوزيع إضاءة احترافي',
                   promptEn: 'Generate an 8K photorealistic cinematic visual with volumetric lighting',
                   color: 'text-rose-400',

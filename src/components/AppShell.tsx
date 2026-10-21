@@ -3,13 +3,11 @@ import {
   Plus,
   Radio,
   Settings as SettingsIcon,
-  Award,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useState, useCallback } from 'react';
 import type { ChatConversation, Language, ViewId } from '../core/domain';
 import { BrandMark } from './BrandMark';
 import { Sidebar } from './Sidebar';
-import { PatentDossierModal } from './PatentDossierModal';
 import { LiveVoiceModal } from '../features/live/LiveVoiceModal';
 import {
   loadAllConversations,
@@ -54,7 +52,6 @@ export function AppShell({
   const [conversations, setConversations] = useState<ChatConversation[]>(() => loadAllConversations());
   const [activeConvId, setActiveConvId] = useState<string>(() => loadConversation().id);
   const [memoryStats, setMemoryStats] = useState(() => getInfiniteMemoryStats());
-  const [isPatentModalOpen, setIsPatentModalOpen] = useState(false);
 
   const refreshConversations = useCallback(() => {
     setConversations(loadAllConversations());
@@ -175,47 +172,15 @@ export function AppShell({
             aria-label="ADEM AI Home"
           >
             <BrandMark compact />
-            <div className="hidden md:flex flex-col text-start leading-tight">
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-xs tracking-wider text-[var(--text)] font-mono">ADEM</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
-                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-semibold">
-                  v4.0
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsPatentModalOpen(true);
-                  }}
-                  className="hidden lg:flex items-center gap-1 px-2 py-0.5 rounded bg-cyan-950/50 border border-cyan-500/35 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-900/50 transition cursor-pointer text-[9.5px] font-mono tracking-wider shadow-xs"
-                  title={isAr ? 'عرض وثيقة براءة الاختراع السيبراني' : 'View Cyber-Patent Dossier'}
-                >
-                  <Award size={11} className="text-cyan-400" />
-                  <span>PAT. #ADEM-2026-X1</span>
-                </button>
-              </div>
-              <span className="text-[9.5px] text-[var(--muted)] font-medium">
-                {isAr ? 'هندسة وبرمجة: adem feidat' : 'Engineered by adem feidat'}
-              </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-xs tracking-wider text-[var(--text)] font-mono">ADEM</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
             </div>
           </div>
         </div>
 
-        {/* Center Section: Unified Single Conversation Mode */}
-        <div className="flex items-center">
-          <div className="flex items-center gap-2 px-3 py-1 sm:py-1.5 rounded-full bg-[var(--surface-2)]/90 border border-[var(--border)] shadow-xs select-none">
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400 shadow-[0_0_8px_#34d399]" />
-            </span>
-            <span className="text-xs font-bold text-[var(--text)] tracking-tight">
-              {isAr ? "المنظومة التنفيذية الموحدة" : "Unified Executive Agent"}
-            </span>
-            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface)] text-[var(--accent)] border border-[var(--border)] font-semibold hidden sm:inline-block">
-              {isAr ? "محادثة واحدة شاملة" : "All-In-One Chat"}
-            </span>
-          </div>
-        </div>
+        {/* Center Section: Minimal Clean Spacer */}
+        <div className="flex-1" />
 
         {/* End Section: Live Voice, New Chat, Language, Settings */}
         <div className="flex items-center gap-1.5 shrink-0">
@@ -234,12 +199,11 @@ export function AppShell({
           <button
             type="button"
             onClick={handleStartNewChat}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] hover:border-[var(--accent)] text-[var(--text)] hover:text-[var(--accent)] text-xs font-semibold transition-all cursor-pointer active:scale-95 shadow-2xs"
+            className="flex items-center justify-center w-8 h-8 rounded-xl bg-[var(--surface-2)] hover:bg-[var(--surface-hover)] border border-[var(--border)] hover:border-[var(--accent)] text-[var(--text)] hover:text-[var(--accent)] transition-all cursor-pointer active:scale-95 shadow-2xs"
             title={isAr ? 'بدء محادثة جديدة (Alt+N)' : 'Start new chat (Alt+N)'}
             aria-label="New Chat"
           >
-            <Plus size={14} className="text-[var(--accent)]" />
-            <span className="hidden sm:inline">{isAr ? 'جديدة' : 'New'}</span>
+            <Plus size={15} className="text-[var(--accent)]" />
           </button>
 
           {/* Language Switcher */}
@@ -299,13 +263,6 @@ export function AppShell({
       <LiveVoiceModal
         isOpen={isLiveVoiceOpen}
         onClose={() => setIsLiveVoiceOpen(false)}
-        language={language}
-      />
-
-      {/* Cyber-Patent Official Dossier Modal */}
-      <PatentDossierModal
-        isOpen={isPatentModalOpen}
-        onClose={() => setIsPatentModalOpen(false)}
         language={language}
       />
     </div>
