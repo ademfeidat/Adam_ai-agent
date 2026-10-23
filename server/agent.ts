@@ -687,14 +687,18 @@ function createGeminiInvoker(apiKey: string, language: 'ar' | 'en', agentName: s
       ? [...history.slice(0, -1), { role: 'user' as const, parts: [{ text: promptText }] }]
       : [{ role: 'user' as const, parts: [{ text: promptText }] }];
 
+    // Prefer current stable Gemini endpoints. The 2.5 family is access-restricted
+    // for new API users, so do not add it as an automatic fallback.
+    const restrictedModels = new Set(['gemini-2.5-flash', 'gemini-2.5-pro']);
+    const selectedModel = restrictedModels.has(modelDesc.id) ? undefined : modelDesc.id;
     const modelVariants = [
       'gemini-3.8-flash',
       'gemini-4-argon',
       'gemini-flash-latest',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash-lite',
       'gemini-3.1-flash-lite',
-      modelDesc.id,
-      'gemini-2.5-flash',
-      'gemini-2.5-pro',
+      selectedModel,
     ];
     const uniqueModels = [...new Set(modelVariants.filter(Boolean))];
 
