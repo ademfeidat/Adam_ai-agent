@@ -108,6 +108,8 @@ export interface SemanticAnalysis {
 export interface MediaItem {
   id: string;
   type: 'image' | 'video' | 'vector';
+  operationName?: string;
+  generationStatus?: 'processing' | 'completed' | 'failed';
   engine?: string;
   title: string;
   originalPrompt: string;
@@ -693,7 +695,8 @@ export function MediaStudio({ language, onNavigate, onRunPromptInChat }: MediaSt
           style: selectedStyle,
         };
       } else if (activeTab === 'video') {
-        endpoint = '/api/media/generate-video';
+        // Use the real asynchronous Veo API; never return a generated still as a fake video.
+        endpoint = '/api/media/veo-generate';
         payload = {
           prompt,
           style: selectedStyle,
@@ -731,13 +734,79 @@ export function MediaStudio({ language, onNavigate, onRunPromptInChat }: MediaSt
       });
 
       const data = await res.json();
-      if (data.ok && data.item) {
+      if (!res.ok || !data.ok) {
+        throw new Error(data.message || data.error || (isAr ? 'فشل التوليد' : 'Generation failed'));
+      }
+
+      let generatedItem: MediaItem | null = data.item || null;
+      if (activeTab === 'video' && data.operationName) {
+        const operationName = String(data.operationName);
+        let completed = false;
+        // Veo jobs are asynchronous. Poll the real operation until the MP4 is ready.
+        for (let attempt = 0; attempt < 120; attempt += 1) {
+          if (abort.signal.aborted) throw new DOMException('Generation cancelled', 'AbortError');
+          setGenerationStep(isAr
+            ? `يجري توليد الفيديو فعليًا عبر Veo… (${Math.min(99, Math.round((attempt + 1) / 120 * 100))}%)`
+            : `Veo is rendering the actual video… check ${attempt + 1}/120`);
+          const statusResponse = await fetch('/api/media/veo-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ operationName }),
+            signal: abort.signal,
+          });
+          const statusData = await statusResponse.json();
+          if (!statusResponse.ok || !statusData.ok) {
+            throw new Error(statusData.message || (isAr ? 'تعذر فحص حالة الفيديو' : 'Could not check video status'));
+          }
+          if (statusData.error) {
+            throw new Error(typeof statusData.error === 'string' ? statusData.error : JSON.stringify(statusData.error));
+          }
+          if (statusData.done && statusData.hasVideo) {
+            generatedItem = {
+              id: `vid_${Date.now().toString(36)}`,
+              type: 'video',
+              operationName,
+              generationStatus: 'completed',
+              engine: `Google ${data.model || 'Veo'}`,
+              title: prompt.slice(0, 50),
+              originalPrompt: prompt,
+              enhancedPrompt: prompt,
+              url: `/api/media/veo-download?operationName=${encodeURIComponent(operationName)}`,
+              aspectRatio: selectedAspect,
+              width: selectedAspect === '9:16' ? 768 : 1280,
+              height: selectedAspect === '9:16' ? 1365 : 720,
+              style: selectedStyle,
+              motion: selectedMotion,
+              duration: 8,
+              fps: 24,
+              seed: seedNum,
+              createdAt: Date.now(),
+            };
+            completed = true;
+            break;
+          }
+          await new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(resolve, 3000);
+            abort.signal.addEventListener('abort', () => {
+              clearTimeout(timer);
+              reject(new DOMException('Generation cancelled', 'AbortError'));
+            }, { once: true });
+          });
+        }
+        if (!completed || !generatedItem) {
+          throw new Error(isAr
+            ? 'استغرق توليد الفيديو وقتًا طويلًا. أعد المحاولة أو تحقق من حالة مزود الفيديو.'
+            : 'Video generation timed out. Retry or check the video provider status.');
+        }
+      }
+
+      if (generatedItem) {
         updateStage(isAr ? '3/3 إنهاء ومعالجة العمل وحفظه…' : '3/3 Finalizing output & caching…', 95, 3);
         if (isImg2Img && sourceImage) {
           setBeforeImage(sourceImage);
           setShowComparison(true);
         }
-        setCurrentResult(data.item);
+        setCurrentResult(generatedItem);
         setVariationResults([]);
         fetchGallery();
       }
@@ -1651,53 +1720,24 @@ export function MediaStudio({ language, onNavigate, onRunPromptInChat }: MediaSt
                           <pre className="whitespace-pre-wrap">{currentResult.svgCode || '<svg>...</svg>'}</pre>
                         </div>
                       )
+                    ) : currentResult.type === 'video' ? (
+                      <video
+                        src={currentResult.url}
+                        poster={currentResult.posterUrl}
+                        controls
+                        playsInline
+                        preload="metadata"
+                        className="w-full h-full object-contain bg-black"
+                        aria-label={currentResult.title}
+                      />
                     ) : (
                       <img
                         src={currentResult.url}
                         alt={currentResult.title}
                         referrerPolicy="no-referrer"
                         style={getFilterStyle()}
-                        className={`w-full h-full object-cover transition-all duration-500 ${
-                          currentResult.type === 'video' && isVideoPlaying ? 'scale-105 brightness-105' : 'scale-100'
-                        }`}
+                        className="w-full h-full object-cover transition-all duration-500"
                       />
-                    )}
-
-                    {/* Video Simulation Overlay */}
-                    {currentResult.type === 'video' && (
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30 flex flex-col justify-between p-3.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-mono text-white bg-black/60 px-2 py-0.5 rounded-md">
-                            Google Veo 3 · 60 FPS
-                          </span>
-                          <span className="text-[10px] font-mono text-white bg-black/60 px-2 py-0.5 rounded-md">
-                            Motion: {currentResult.motion || 'FPV Drone'}
-                          </span>
-                        </div>
-
-                        {/* Player Controls & Progress Bar */}
-                        <div className="space-y-2">
-                          <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
-                            <div
-                              className="bg-emerald-400 h-full transition-all duration-100 ease-linear"
-                              style={{ width: `${videoProgress}%` }}
-                            />
-                          </div>
-
-                          <div className="flex items-center justify-between text-white text-xs">
-                            <button
-                              type="button"
-                              onClick={() => setIsVideoPlaying(!isVideoPlaying)}
-                              className="p-1.5 rounded-lg bg-white/20 hover:bg-white/30 backdrop-blur-sm transition cursor-pointer"
-                            >
-                              {isVideoPlaying ? <Pause size={14} /> : <Play size={14} className="fill-current" />}
-                            </button>
-                            <span className="text-[10px] font-mono text-slate-300">
-                              00:0{Math.floor((videoProgress / 100) * 5)} / 00:05
-                            </span>
-                          </div>
-                        </div>
-                      </div>
                     )}
                   </>
                 ) : (
