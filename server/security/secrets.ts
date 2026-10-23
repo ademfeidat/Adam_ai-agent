@@ -16,6 +16,7 @@ class SecretsManager {
     // Collect all sensitive environment variables
     const sensitiveKeys = [
       'GEMINI_API_KEY',
+      'OPENROUTER_API_KEY',
       'HUGGINGFACE_API_KEY',
       'HF_TOKEN',
       'HUGGINGFACE_TOKEN',
