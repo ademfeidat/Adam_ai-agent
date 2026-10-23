@@ -1103,81 +1103,8 @@ app.post('/api/media/generate-vector', mediaRateLimiter.middleware(), async (req
   }
 });
 
-app.post('/api/media/generate-video', mediaRateLimiter.middleware(), async (req, res) => {
-  try {
-    const { prompt, style, motion, aspectRatio, duration, fps, seed } = req.body || {};
-    if (!prompt || typeof prompt !== 'string') {
-      return res.status(400).json({ ok: false, error: 'Prompt is required' });
-    }
-
-    const permCheck = AgentPermissionGuard.canExecuteTool('generate_video', req.user);
-    if (!permCheck.allowed) {
-      return res.status(403).json({ ok: false, error: permCheck.reason });
-    }
-
-    const effectiveUid = req.user?.uid || 'guest_user';
-    const budgetCheck = costControlManager.checkBudget(effectiveUid, true);
-    if (!budgetCheck.allowed) {
-      return res.status(429).json({ ok: false, error: budgetCheck.reason });
-    }
-
-    const item = await mediaEngine.generateVideo({
-      prompt: prompt.slice(0, 1000),
-      style,
-      motion,
-      aspectRatio,
-      duration,
-      fps,
-      seed,
-      apiKey,
-      userId: effectiveUid,
-    });
-
-    costControlManager.recordUsage(effectiveUid, 100, true);
-
-    res.json({ ok: true, item });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err?.message || 'Failed to generate video' });
-  }
-});
-
-app.post('/api/media/veo-generate', mediaRateLimiter.middleware(), async (req, res) => {
-  try {
-    const { prompt, style, motion, aspectRatio, duration, fps, seed } = req.body || {};
-    if (!prompt || typeof prompt !== 'string') {
-      return res.status(400).json({ ok: false, error: 'Prompt is required' });
-    }
-
-    const item = await mediaEngine.generateVideo({
-      prompt: prompt.slice(0, 1000),
-      style: style || 'cinematic',
-      motion: motion || 'drone_fpv',
-      aspectRatio: aspectRatio || '16:9',
-      duration,
-      fps,
-      seed,
-      apiKey,
-      userId: req.user.uid,
-    });
-
-    res.json({ ok: true, item, operationName: `veo_op_${Date.now()}` });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err?.message || 'Failed to generate video' });
-  }
-});
-
-app.post('/api/media/veo-status', async (_req, res) => {
-  res.json({ ok: true, done: true });
-});
-
-app.get('/api/media/veo-download', async (_req, res) => {
-  const latestVideo = mediaEngine.getGallery().find(it => it.type === 'video');
-  if (latestVideo?.url) {
-    return res.redirect(latestVideo.url);
-  }
-  res.status(404).json({ ok: false, error: 'Video not found' });
-});
-
+// Real Veo generation, status polling and download are provided by
+// geminiMultimodalRouter below. Do not register placeholder routes here:
 app.post('/api/media/image-to-image', mediaRateLimiter.middleware(), async (req, res) => {
   try {
     const { prompt, sourceImage, style, aspectRatio, seed } = req.body || {};
