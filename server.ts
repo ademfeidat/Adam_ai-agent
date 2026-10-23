@@ -108,6 +108,8 @@ app.get('/api/health', (_req, res) => {
     agent: 'ADEM',
     configured: Boolean(secretsManager.getGeminiApiKey()) || isOpenRouterConfigured() || isGatewayConfigured(),
     agentic: true,
+    provider: isOpenRouterConfigured() ? 'openrouter' : (process.env.AI_GATEWAY_API_KEY?.trim() ? 'vercel-ai-gateway' : 'gemini'),
+    model: isOpenRouterConfigured() ? getOpenRouterModel() : model,
     timestamp: Date.now(),
   });
 });
