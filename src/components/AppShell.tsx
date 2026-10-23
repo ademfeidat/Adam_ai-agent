@@ -3,6 +3,7 @@ import {
   Plus,
   Radio,
   Settings as SettingsIcon,
+  UserRound,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useState, useCallback } from 'react';
 import type { ChatConversation, Language, ViewId } from '../core/domain';
@@ -232,6 +233,17 @@ export function AppShell({
             aria-label="Settings"
           >
             <SettingsIcon size={14} />
+          </button>
+
+          {/* Profile access: opens the animated sign-in / guest experience on demand. */}
+          <button
+            type="button"
+            onClick={() => _onOpenAuth?.()}
+            className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500/15 to-teal-500/10 hover:from-emerald-500/25 hover:to-teal-500/20 border border-emerald-500/35 hover:border-emerald-400/70 text-emerald-300 hover:text-emerald-200 transition-all cursor-pointer active:scale-95 shadow-sm shadow-emerald-950/20"
+            title={isAr ? 'الملف الشخصي وتسجيل الدخول' : 'Profile and sign in'}
+            aria-label={isAr ? 'الملف الشخصي وتسجيل الدخول' : 'Profile and sign in'}
+          >
+            <UserRound size={17} strokeWidth={2.2} />
           </button>
         </div>
       </header>
