@@ -14,7 +14,7 @@ npm ci
 cp .env.example .env
 ```
 
-Edit `.env` and set `GEMINI_API_KEY` to your server-side Gemini API key.
+Edit `.env` and configure at least one server-side AI provider. For the independent, multi-model provider, set `OPENROUTER_API_KEY`; the existing Gemini provider remains available as a fallback.
 
 ```bash
 npm run dev
@@ -33,12 +33,21 @@ A healthy server reports `ok: true`; `configured` reports whether the server det
 Optional server variables:
 
 ```env
+# Independent provider (recommended for the main chat/agent)
+OPENROUTER_API_KEY=...
+ADAM_OPENROUTER_MODEL=anthropic/claude-sonnet-4.6
+# Optional model-level fallbacks, comma-separated
+ADAM_OPENROUTER_FALLBACK_MODELS=google/gemini-3.8-flash
+
+# Existing provider / fallback
 GEMINI_API_KEY=...
 ADAM_GEMINI_MODEL=gemini-3.8-flash
 PORT=3000
 ```
 
-Never commit `.env` or provider secrets. The browser and Android/iOS client must never embed `GEMINI_API_KEY`.
+OpenRouter is isolated in `server/openRouterProvider.ts`. It uses a server-side key, configurable model routing, optional model-level fallbacks, provider-side failover, and tool-enabled streaming for the main chat. If `OPENROUTER_API_KEY` is set, it takes priority for the main chat and is prioritized in agent runs; Gemini remains available for Gemini-specific features and as a fallback. OpenRouter usage may incur charges according to the selected model and account credits.
+
+Never commit `.env` or provider secrets. The browser and Android/iOS client must never embed `OPENROUTER_API_KEY` or `GEMINI_API_KEY`.
 
 ## Quality checks
 
@@ -67,9 +76,10 @@ Domain + storage + AI client
   ↓
 POST /api/chat (NDJSON stream)
   ↓
-Server provider adapter
-  ↓
-Gemini
+Server-only provider router
+  ├─ OpenRouter (independent, configurable model chain)
+  ├─ Vercel AI Gateway (optional)
+  └─ Gemini direct API (fallback / Gemini-specific features)
 ```
 
 The browser never needs a provider API key. The server owns provider credentials and converts provider failures into stable application errors.
