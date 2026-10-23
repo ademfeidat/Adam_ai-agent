@@ -700,7 +700,7 @@ function createGeminiInvoker(apiKey: string, language: 'ar' | 'en', agentName: s
       'gemini-3.1-flash-lite',
       selectedModel,
     ];
-    const uniqueModels = [...new Set(modelVariants.filter(Boolean))];
+    const uniqueModels = [...new Set(modelVariants.filter((model): model is string => Boolean(model)))];
 
     for (const modelId of uniqueModels) {
       // Try with Google Search if available and requested, then fallback to tool-free
