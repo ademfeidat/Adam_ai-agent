@@ -33,6 +33,7 @@ import { sanitizeAgentIdentity } from '../src/core/agent/responseSanitizer';
 import { buildHarnessPlan, formatHarnessInstruction, verifyHarnessOutput } from './ecc';
 import { huggingFaceEngine } from './huggingfaceEngine';
 import { detectMessageLanguage } from '../src/core/utils/languageDetector';
+import { completeOpenRouterChat, getOpenRouterModel, isOpenRouterConfigured } from './openRouterProvider';
 
 export function isExplicitImageRequest(prompt: string): boolean {
   const p = prompt.trim().toLowerCase();
@@ -959,7 +960,7 @@ export function registerAgentRoute(app: Express, apiKey: string, model: string) 
     const runId = `run_${requestId}`;
     res.setHeader('X-Request-Id', requestId);
     const currentApiKey = apiKey || secretsManager.getGeminiApiKey() || (req.headers['x-gemini-api-key'] as string) || '';
-    if (!currentApiKey) return sendError(res, 503, 'AI_NOT_CONFIGURED', 'Adam AI has no active Gemini API key configured in server environment.');
+    if (!currentApiKey && !isOpenRouterConfigured()) return sendError(res, 503, 'AI_NOT_CONFIGURED', 'Configure OPENROUTER_API_KEY or GEMINI_API_KEY in the server environment.');
     const messages = normalizeMessages(body.messages);
     if (!messages.length) return sendError(res, 400, 'EMPTY_MESSAGE', 'Please send a message before starting an agent run.');
     if (!requestDeduplicator.begin(requestId)) return sendError(res, 409, 'REQUEST_IN_PROGRESS', 'This request is already being processed.');
@@ -1122,9 +1123,30 @@ export function registerAgentRoute(app: Express, apiKey: string, model: string) 
         swarmPlan = { task: mission, assignments: [], waves: [] };
       }
       const capabilities = inferCapabilities(latestPrompt);
+      if (isOpenRouterConfigured()) {
+        const openRouterModel = getOpenRouterModel();
+        modelRegistry.register({
+          id: openRouterModel,
+          provider: 'openai-compatible',
+          displayName: `Independent Provider · ${openRouterModel}`,
+          capabilities: ['general', 'reasoning', 'coding', 'math', 'vision', 'arabic'],
+          quality: 10,
+          speed: 9.4,
+          cost: 2,
+          enabled: true,
+          endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+        });
+      }
       const plan = routeTask({ prompt: latestPrompt, capabilities, maxModels: requestedMaxModels, preferSpeed: latestPrompt.length < 1500 });
-      const fallback = modelRegistry.get(model) ?? modelRegistry.enabled().find(candidate => candidate.provider === 'gemini' || candidate.provider === 'ADEM-G');
-      const candidates = [...plan.ensemble, ...(fallback && !plan.ensemble.some(candidate => candidate.id === fallback.id) ? [fallback] : [])].slice(0, MAX_SWARM_MODELS);
+      const fallback = currentApiKey
+        ? (modelRegistry.get(model) ?? modelRegistry.enabled().find(candidate => candidate.provider === 'gemini' || candidate.provider === 'ADEM-G'))
+        : undefined;
+      const openRouterDescriptor = isOpenRouterConfigured() ? modelRegistry.get(getOpenRouterModel()) : undefined;
+      const candidates = [
+        ...(openRouterDescriptor ? [openRouterDescriptor] : []),
+        ...plan.ensemble.filter(candidate => candidate.id !== openRouterDescriptor?.id),
+        ...(fallback && !plan.ensemble.some(candidate => candidate.id === fallback.id) && fallback.id !== openRouterDescriptor?.id ? [fallback] : []),
+      ].slice(0, MAX_SWARM_MODELS);
       if (!candidates.length) return sendError(res, 503, 'NO_MODEL_AVAILABLE', 'No enabled AI model is available.');
 
       const isCasualGreeting = isConversationalQuery(latestPrompt);
@@ -1134,8 +1156,22 @@ export function registerAgentRoute(app: Express, apiKey: string, model: string) 
         + formatRequestContract(requestContract, language)
         + formatExecutionPlan(executionPlan, language)
         + formatHarnessInstruction(harnessPlan, language);
-      const geminiInvoker = createGeminiInvoker(currentApiKey, language, agentName, messages, useSearch, user?.uid ?? '', user);
-      const invoke = async (selected: ModelDescriptor, request: ModelRequest) => (selected.provider === 'gemini' || selected.provider === 'ADEM-G') ? geminiInvoker(selected, request) : remoteGateway.gateway.invokeSelected(selected, request).then(result => result.text);
+      const geminiInvoker = currentApiKey ? createGeminiInvoker(currentApiKey, language, agentName, messages, useSearch, user?.uid ?? '', user) : null;
+      const invoke = async (selected: ModelDescriptor, request: ModelRequest) => {
+        if (selected.id === getOpenRouterModel() && isOpenRouterConfigured()) {
+          return completeOpenRouterChat({
+            prompt: request.prompt,
+            system: request.system,
+            temperature: request.temperature,
+            maxTokens: request.maxTokens,
+          });
+        }
+        if (selected.provider === 'gemini' || selected.provider === 'ADEM-G') {
+          if (!geminiInvoker) throw new Error('Gemini credentials are not configured.');
+          return geminiInvoker(selected, request);
+        }
+        return remoteGateway.gateway.invokeSelected(selected, request).then(result => result.text);
+      };
       res.setHeader('X-Adam-Model', candidates.map(m => m.id).join(','));
       res.setHeader('X-Adam-Registry-Size', String(modelRegistry.size()));
       res.setHeader('X-Adam-Swarm-Concurrency', String(SWARM_CONCURRENCY));
