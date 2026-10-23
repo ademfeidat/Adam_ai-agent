@@ -10,16 +10,20 @@ export default defineConfig(() => {
     plugins: [
       react(),
       tailwindcss(),
-      viteCompression({
-        algorithm: 'gzip',
-        ext: '.gz',
-        threshold: 1024,
-      }),
-      viteCompression({
-        algorithm: 'brotliCompress',
-        ext: '.br',
-        threshold: 1024,
-      }),
+      // Native Android WebView assets must not contain duplicate compressed
+      // copies of each resource. Keep compression for web builds only.
+      ...(process.env.CAPACITOR_BUILD === 'true' ? [] : [
+        viteCompression({
+          algorithm: 'gzip',
+          ext: '.gz',
+          threshold: 1024,
+        }),
+        viteCompression({
+          algorithm: 'brotliCompress',
+          ext: '.br',
+          threshold: 1024,
+        }),
+      ]),
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.png', 'icon.svg'],
