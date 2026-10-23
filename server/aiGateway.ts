@@ -1,5 +1,11 @@
 import { AGENT_ACTION_TOOLS, executeAgentActionTool } from '../src/core/agent/toolExecution';
 import { AgentPermissionGuard } from './security/agentPermissions';
+import {
+  getOpenRouterApiKey,
+  getOpenRouterModelChain,
+  isOpenRouterConfigured,
+  OPENROUTER_CHAT_URL,
+} from './openRouterProvider';
 
 type GatewayMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -22,18 +28,32 @@ type StreamGatewayChatArgs = {
   maxToolRounds?: number;
 };
 
-const GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1/chat/completions';
+const VERCEL_GATEWAY_URL = 'https://ai-gateway.vercel.sh/v1/chat/completions';
 
-function getAuthToken(_req: any): string {
-  // Do not silently switch production traffic to Vercel AI Gateway OIDC.
-  // The project has a direct Gemini backend and the Gateway may require
-  // separate customer verification/billing even when OIDC is present.
-  // Gateway usage is therefore explicit: configure AI_GATEWAY_API_KEY.
-  return process.env.AI_GATEWAY_API_KEY?.trim() || '';
+type ProviderConfig = {
+  kind: 'openrouter' | 'vercel';
+  token: string;
+  endpoint: string;
+};
+
+function getProviderConfig(): ProviderConfig | null {
+  // OpenRouter is a completely separate, explicitly configured provider. It
+  // takes priority when its server-side key is present; otherwise preserve the
+  // existing optional Vercel AI Gateway path.
+  const openRouterKey = getOpenRouterApiKey();
+  if (openRouterKey) {
+    return { kind: 'openrouter', token: openRouterKey, endpoint: OPENROUTER_CHAT_URL };
+  }
+
+  const vercelToken = process.env.AI_GATEWAY_API_KEY?.trim() || '';
+  if (vercelToken) {
+    return { kind: 'vercel', token: vercelToken, endpoint: VERCEL_GATEWAY_URL };
+  }
+  return null;
 }
 
-export function isGatewayConfigured(req?: any): boolean {
-  return Boolean(getAuthToken(req));
+export function isGatewayConfigured(_req?: any): boolean {
+  return Boolean(getProviderConfig());
 }
 
 function toOpenAIContent(parts: any[]): any {
@@ -202,7 +222,7 @@ async function executeToolCalls(toolCalls: Array<{ id: string; name: string; arg
 }
 
 async function callGateway(
-  token: string,
+  provider: ProviderConfig,
   model: string,
   messages: GatewayMessage[],
   temperature: number,
@@ -212,7 +232,6 @@ async function callGateway(
   const gatewayModel = model.includes('/') ? model : `google/${model}`;
 
   const body: any = {
-    model: gatewayModel,
     messages,
     temperature,
     top_p: topP,
@@ -223,19 +242,34 @@ async function callGateway(
     tool_choice: 'auto',
   };
 
-  const response = await fetch(GATEWAY_URL, {
+  if (provider.kind === 'openrouter') {
+    // OpenRouter's model chain is independent of Gemini model IDs. It can
+    // retry configured backup models and provider endpoints behind one API.
+    body.models = getOpenRouterModelChain();
+    body.provider = { allow_fallbacks: true };
+  } else {
+    body.model = gatewayModel;
+  }
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${provider.token}`,
+    'Content-Type': 'application/json',
+    Accept: 'text/event-stream',
+  };
+  if (provider.kind === 'openrouter') {
+    headers['HTTP-Referer'] = process.env.OPENROUTER_HTTP_REFERER?.trim() || 'https://adam-ai-agent.vercel.app';
+    headers['X-OpenRouter-Title'] = 'Adam AI Agent';
+  }
+
+  const response = await fetch(provider.endpoint, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-    },
+    headers,
     body: JSON.stringify(body),
   });
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');
-    const error = new Error(`AI Gateway ${response.status}: ${errorText.slice(0, 1200)}`);
+    const error = new Error(`${provider.kind === 'openrouter' ? 'OpenRouter' : 'AI Gateway'} ${response.status}: ${errorText.slice(0, 1200)}`);
     (error as any).status = response.status;
     throw error;
   }
@@ -244,9 +278,9 @@ async function callGateway(
 }
 
 export async function streamGatewayChat(args: StreamGatewayChatArgs) {
-  const token = getAuthToken(args.req);
-  if (!token) {
-    const error = new Error('AI Gateway authentication is not configured.');
+  const provider = getProviderConfig();
+  if (!provider) {
+    const error = new Error('No external AI provider is configured.');
     (error as any).status = 503;
     throw error;
   }
@@ -257,7 +291,7 @@ export async function streamGatewayChat(args: StreamGatewayChatArgs) {
 
   for (let round = 0; round <= maxRounds; round += 1) {
     const response = await callGateway(
-      token,
+      provider,
       args.model,
       conversation,
       args.temperature,
