@@ -697,12 +697,15 @@ export function MediaStudio({ language, onNavigate, onRunPromptInChat }: MediaSt
       } else if (activeTab === 'video') {
         // Use the real asynchronous Veo API; never return a generated still as a fake video.
         endpoint = '/api/media/veo-generate';
+        const sourceMatch = sourceImage?.match(/^data:([^;]+);base64,(.+)$/);
         payload = {
           prompt,
           style: selectedStyle,
           motion: selectedMotion,
           aspectRatio: selectedAspect,
           seed: seedNum,
+          // If a reference image is loaded, ask Veo to animate it (image-to-video).
+          image: sourceMatch ? { imageBytes: sourceMatch[2], mimeType: sourceMatch[1] } : undefined,
         };
       } else if (isImg2Img && sourceImage) {
         endpoint = '/api/media/image-to-image';
