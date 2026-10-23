@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { GoogleGenAI } from '@google/genai';
+import { huggingFaceEngine } from './huggingfaceEngine';
 
 function withTimeout<T>(promise: Promise<T>, ms = 2500, fallbackMsg = 'Upstream timed out'): Promise<T> {
   return Promise.race([
@@ -690,7 +691,7 @@ Return strictly valid JSON with keys: enhancedPromptEn, explanationAr, semanticA
       .slice(0, 950);
 
     let finalUrl = '';
-    let usedEngineLabel = 'FLUX.1 Pro High-Performance';
+    let usedEngineLabel = 'Automatic Image Provider';
 
     // 4. Google Gemini Nano Banana 2.1 (supports 1K, 2K, 4K and extended aspect ratios)
     if (chosenEngine === 'gemini-nano-banana' && params.apiKey) {
@@ -793,11 +794,29 @@ Return strictly valid JSON with keys: enhancedPromptEn, explanationAr, semanticA
       usedEngineLabel = 'FLUX Turbo Ultra-Fast (<1s)';
     }
 
-    // 8. Default High-Fidelity FLUX Pipeline
+    // 8. Use configured Hugging Face inference before the public image endpoint.
+    // The key is read only from server environment; it is never passed to the client.
+    if (!finalUrl && huggingFaceEngine.getStatus().configured) {
+      try {
+        const hfImage = await huggingFaceEngine.generateImage({
+          prompt: fluxPrompt || 'photorealistic masterpiece, high detail',
+          model: 'black-forest-labs/FLUX.1-schnell',
+        });
+        if (hfImage.dataUrl.startsWith('data:image/')) {
+          finalUrl = hfImage.dataUrl;
+          usedEngineLabel = `Hugging Face ${hfImage.model}`;
+        }
+      } catch (hfErr) {
+        console.warn('[MediaEngine] Hugging Face image fallback failed; trying public image provider:', hfErr);
+      }
+    }
+
+    // 9. Public image-generation fallback. This creates an image, not a video.
     if (!finalUrl) {
       const modelParam = chosenEngine === 'flux-turbo' ? 'turbo' : 'flux';
       const encodedPrompt = encodeURIComponent(fluxPrompt || 'photorealistic masterpiece 8k');
-      finalUrl = `https://pollinations.ai/p/${encodedPrompt}?width=${dims.width}&height=${dims.height}&model=${modelParam}&nologo=true&seed=${seed}`;
+      finalUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${dims.width}&height=${dims.height}&model=${modelParam}&nologo=true&seed=${seed}`;
+      usedEngineLabel = `Pollinations image provider (${modelParam})`;
     }
 
     const item: MediaItem = {
