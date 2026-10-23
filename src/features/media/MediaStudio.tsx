@@ -739,6 +739,9 @@ export function MediaStudio({ language, onNavigate, onRunPromptInChat }: MediaSt
       }
 
       let generatedItem: MediaItem | null = data.item || null;
+      if (activeTab === 'video' && !data.operationName) {
+        throw new Error(data.message || (isAr ? 'لم يُرجع مزود الفيديو معرّف عملية صالحًا' : 'The video provider did not return a valid operation ID'));
+      }
       if (activeTab === 'video' && data.operationName) {
         const operationName = String(data.operationName);
         let completed = false;
@@ -785,13 +788,7 @@ export function MediaStudio({ language, onNavigate, onRunPromptInChat }: MediaSt
             completed = true;
             break;
           }
-          await new Promise<void>((resolve, reject) => {
-            const timer = setTimeout(resolve, 3000);
-            abort.signal.addEventListener('abort', () => {
-              clearTimeout(timer);
-              reject(new DOMException('Generation cancelled', 'AbortError'));
-            }, { once: true });
-          });
+          await new Promise<void>((resolve) => setTimeout(resolve, 3000));
         }
         if (!completed || !generatedItem) {
           throw new Error(isAr
