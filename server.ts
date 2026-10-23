@@ -41,6 +41,7 @@ import { setupLiveApiWebSocket } from './server/features/liveApiBridge';
 import { buildHarnessPlan, formatHarnessInstruction, verifyHarnessOutput } from './server/ecc';
 import { buildGuardianReport } from './server/guardian';
 import { isGatewayConfigured, streamGatewayChat } from './server/aiGateway';
+import { getOpenRouterModel, isOpenRouterConfigured } from './server/openRouterProvider';
 import { detectMessageLanguage } from './src/core/utils/languageDetector';
 
 // Process-level shields against unexpected crashes and unhandled promise rejections
@@ -105,7 +106,7 @@ app.get('/api/health', (_req, res) => {
     ok: true,
     status: 'online',
     agent: 'ADEM',
-    configured: Boolean(secretsManager.getGeminiApiKey()),
+    configured: Boolean(secretsManager.getGeminiApiKey()) || isOpenRouterConfigured() || isGatewayConfigured(),
     agentic: true,
     timestamp: Date.now(),
   });
@@ -1369,7 +1370,7 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
   let aborted = false;
   res.setHeader('X-Request-Id', requestId);
   const currentApiKey = apiKey || secretsManager.getGeminiApiKey() || (req.headers['x-gemini-api-key'] as string) || '';
-  console.info('[Adam AI chat] request started', { requestId, model, hasGeminiApiKey: Boolean(currentApiKey), messageCount: Array.isArray(req.body?.messages) ? req.body.messages.length : 0 });
+  console.info('[Adam AI chat] request started', { requestId, model: isOpenRouterConfigured() ? getOpenRouterModel() : model, hasGeminiApiKey: Boolean(currentApiKey), hasOpenRouterKey: isOpenRouterConfigured(), messageCount: Array.isArray(req.body?.messages) ? req.body.messages.length : 0 });
   res.once('close', () => {
     if (!res.writableFinished) aborted = true;
   });
@@ -1381,7 +1382,7 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
       status: 503,
       durationMs: Date.now() - requestStartedAt,
     });
-    return sendError(res, 503, 'AI_NOT_CONFIGURED', 'Adam AI has no active server-side AI credential. Configure GEMINI_API_KEY in your Vercel project environment variables.');
+    return sendError(res, 503, 'AI_NOT_CONFIGURED', 'No server-side AI provider is configured. Set OPENROUTER_API_KEY or GEMINI_API_KEY in the Vercel environment.');
   }
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body ?? {};
   const messages = normalizeMessages(body?.messages ?? body?.message ?? body?.prompt ?? body);
@@ -1523,7 +1524,7 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
       ? `\n\nUSER PERSISTENT MEMORY (ISOLATED & PRIVATE):\n${relevantMemories.map(m => `- ${m.text}`).join('\n')}`
       : '';
 
-    const ai = new GoogleGenAI({ apiKey: currentApiKey });
+    const ai = currentApiKey ? new GoogleGenAI({ apiKey: currentApiKey }) : null;
     const hermesAugmentedInstruction = hermesEngine.augmentSystemInstruction(systemInstruction(language, agentName) + memoryContext, userPrompt, language);
 
     // Apply sandwich defense wrapper to protect instruction integrity while preserving attached image inlineData
@@ -1583,7 +1584,7 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
       systemInstruction: finalSystemInstruction,
     };
 
-    const candidateModels = getHealthSortedModels(model);
+    const candidateModels = isOpenRouterConfigured() ? [getOpenRouterModel()] : getHealthSortedModels(model);
     let output = '';
     const streamModelOutput = true;
     const emitModelText = (text: string) => {
@@ -1655,10 +1656,10 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
       }
 
       for (const config of configsToTry) {
-        if (aborted || res.writableEnded || res.destroyed || modelSuccess || modelEncountered503) break;
+        if (!currentApiKey || aborted || res.writableEnded || res.destroyed || modelSuccess || modelEncountered503) break;
 
         try {
-          const stream = await ai.models.generateContentStream({ model: currentModel, contents: defendedMessages, config: buildGenerationConfig(config, currentModel) });
+          const stream = await ai!.models.generateContentStream({ model: currentModel, contents: defendedMessages, config: buildGenerationConfig(config, currentModel) });
           for await (const chunk of stream) {
             if (aborted || res.writableEnded || res.destroyed) break;
 
@@ -1849,7 +1850,7 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
           if (aborted || res.writableEnded || res.destroyed) return;
 
           if (!output.trim()) {
-            const completion = await ai.models.generateContent({ model: currentModel, contents: defendedMessages, config: buildGenerationConfig(config, currentModel) });
+            const completion = await ai!.models.generateContent({ model: currentModel, contents: defendedMessages, config: buildGenerationConfig(config, currentModel) });
             const completionMetadata = (completion as any).groundingMetadata || (completion as any).candidates?.[0]?.groundingMetadata;
             if (completionMetadata) {
               const extracted = extractGroundingMetadata(completionMetadata);
@@ -2385,7 +2386,7 @@ ${text.slice(0, 10000)}
 
     for (const m of modelsToTry) {
       try {
-        const response = await ai.models.generateContent({
+        const response = await ai!.models.generateContent({
           model: m,
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           config: {
