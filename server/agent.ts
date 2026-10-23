@@ -1066,32 +1066,40 @@ export function registerAgentRoute(app: Express, apiKey: string, model: string) 
         }
 
         let videoUrl = '';
-        let title = language === 'ar' ? 'مشهد سينمائي متحرك' : 'Cinematic Video Scene';
-        let desc = language === 'ar' ? 'تم تصميم لقطة الفيديو السينمائية بأعلى مواصفات الإخراج والحركة.' : 'Cinematic video sequence designed.';
+        let title = language === 'ar' ? 'مشهد فيديو سينمائي' : 'Cinematic Video';
+        let desc = '';
+        let operationName = '';
         try {
           const item = await mediaEngine.generateVideo({ prompt: latestPrompt, apiKey, userId: user?.uid });
-          videoUrl = item.posterUrl || item.url;
+          videoUrl = item.url;
+          operationName = item.operationName || '';
           title = item.title || title;
-          desc = item.explanationAr || desc;
+          desc = item.explanationAr || '';
           costControlManager.recordUsage(user?.uid, 100, true);
         } catch (vidErr) {
-          console.warn('[Adam AI Agent] mediaEngine.generateVideo threw, using direct fallback URL:', vidErr);
-          const encoded = encodeURIComponent(`${latestPrompt}, cinematic video still, IMAX 70mm, 60fps motion`);
-          videoUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1280&height=720&nologo=true&enhance=true`;
+          console.warn('[Adam AI Agent] Real video generation unavailable:', redactSecrets(String(vidErr)));
+          res.status(200).setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache, no-transform');
+          res.setHeader('X-Accel-Buffering', 'no');
+          res.flushHeaders?.();
+          const message = language === 'ar'
+            ? 'تعذر بدء توليد الفيديو الحقيقي. يلزم ضبط GEMINI_API_KEY مع صلاحية Veo وحصة متاحة. لم أستبدل الفيديو بصورة ثابتة.'
+            : 'Real video generation could not start. Configure GEMINI_API_KEY with Veo access and available quota. No still image was substituted for a video.';
+          safeWrite(res, { type: 'delta', text: message });
+          safeWrite(res, { type: 'done', model: 'media-engine-video-unavailable', tried: 1, swarmSize: 1, registrySize: modelRegistry.size() });
+          safeEnd(res);
+          return;
         }
-
-        const details = language === 'ar'
-          ? `\n\n- **حركة المشهد:** حركة كاميرا سينمائية سلسة\n- **الجودة:** 60 FPS Cinema HD`
-          : `\n\n- **Motion:** Cinematic camera tracking\n- **Quality:** 60 FPS Cinema HD`;
 
         res.status(200).setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
         res.setHeader('Cache-Control', 'no-cache, no-transform');
         res.setHeader('X-Accel-Buffering', 'no');
         res.flushHeaders?.();
 
-        const outputText = `![${title}](${videoUrl})\n\n${desc}${details}`;
+        const linkLabel = language === 'ar' ? 'فتح/تنزيل ملف الفيديو عند اكتماله' : 'Open/download the video when ready';
+        const outputText = `**${title}**\n\n${desc}\n\n[${linkLabel}](${videoUrl})\n\n${language === 'ar' ? 'حالة التوليد: قيد المعالجة. قد يستغرق تجهيز ملف MP4 بعض الوقت.' : 'Generation status: processing. The MP4 may take some time to become available.'}`;
         safeWrite(res, { type: 'delta', text: outputText });
-        safeWrite(res, { type: 'done', model: 'media-engine-video', tried: 1, swarmSize: 1, registrySize: modelRegistry.size() });
+        safeWrite(res, { type: 'done', model: 'media-engine-video', operationName, tried: 1, swarmSize: 1, registrySize: modelRegistry.size() });
         safeEnd(res);
         return;
       }
