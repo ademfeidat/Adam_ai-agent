@@ -96,6 +96,8 @@ export interface MediaItem {
   explanationAr?: string;
   url: string;
   posterUrl?: string;
+  operationName?: string;
+  generationStatus?: 'processing' | 'completed' | 'failed';
   svgCode?: string;
   aspectRatio: AspectRatio;
   width: number;
@@ -1181,15 +1183,21 @@ CRITICAL RULES:
     });
 
     let veoOperationName = '';
-    let usedEngineLabel = 'Google Veo 3.1 Cinematic Engine';
+    let usedEngineLabel = 'Google Veo 3.1';
 
-    if (params.apiKey) {
-      try {
-        const ai = new GoogleGenAI({ apiKey: params.apiKey });
-        const validAspect = aspectRatio === '9:16' ? '9:16' : '16:9';
+    if (!params.apiKey) {
+      throw new Error('Real video generation requires GEMINI_API_KEY with Veo access. No still-image fallback is presented as a video.');
+    }
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: params.apiKey });
+      const validAspect = aspectRatio === '9:16' ? '9:16' : '16:9';
+      const models = ['veo-3.1-generate-preview', 'veo-3.1-fast-generate-preview', 'veo-3.1-lite-generate-preview'];
+      let lastError: unknown;
+      for (const modelName of models) {
         try {
           const operation = await ai.models.generateVideos({
-            model: 'veo-3.1-lite-generate-preview',
+            model: modelName,
             prompt: enhancement.enhancedPromptEn,
             config: {
               numberOfVideos: 1,
@@ -1197,26 +1205,22 @@ CRITICAL RULES:
               aspectRatio: validAspect,
             },
           });
-          if (operation && operation.name) {
+          if (operation?.name) {
             veoOperationName = operation.name;
+            usedEngineLabel = `Google ${modelName}`;
+            break;
           }
-        } catch {
-          const opFast = await ai.models.generateVideos({
-            model: 'veo-3.1-fast-generate-preview',
-            prompt: enhancement.enhancedPromptEn,
-            config: {
-              numberOfVideos: 1,
-              resolution: '720p',
-              aspectRatio: validAspect,
-            },
-          });
-          if (opFast && opFast.name) {
-            veoOperationName = opFast.name;
-          }
+        } catch (error) {
+          lastError = error;
         }
-      } catch (veoErr) {
-        console.warn('[MediaEngine] Google Veo generation warning, fallback to cinematic render:', veoErr);
       }
+      if (!veoOperationName) {
+        const reason = lastError instanceof Error ? lastError.message : 'Veo did not return an operation ID.';
+        throw new Error(reason);
+      }
+    } catch (veoErr) {
+      console.error('[MediaEngine] Real Veo generation failed:', veoErr);
+      throw new Error('Veo video generation could not be started. Verify GEMINI_API_KEY, Veo model access, and provider quota.');
     }
 
     const encodedPrompt = encodeURIComponent(`${enhancement.enhancedPromptEn}, cinematic video still, master frame`);
@@ -1226,13 +1230,15 @@ CRITICAL RULES:
       id: `vid_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
       type: 'video',
       engine: usedEngineLabel,
+      operationName: veoOperationName,
+      generationStatus: 'processing',
       title: params.prompt.slice(0, 50),
       originalPrompt: params.prompt,
       enhancedPrompt: enhancement.enhancedPromptEn,
       negativePrompt: enhancement.negativePrompt,
       semanticAnalysis: enhancement.semanticAnalysis,
-      explanationAr: `تم توليد الفيديو عبر محرك قوقل الرسمي Veo 3.1 بدقة 720p مع حركة سينمائية ${motion} وإضاءة حجمية مذهلة.`,
-      url: posterUrl,
+      explanationAr: `بدأ توليد الفيديو الحقيقي عبر ${usedEngineLabel}. معرّف العملية محفوظ لفحص حالة التوليد وتنزيل ملف MP4 عند اكتماله.`,
+      url: `/api/media/veo-download?operationName=${encodeURIComponent(veoOperationName)}`,
       posterUrl,
       aspectRatio,
       width: dims.width,
