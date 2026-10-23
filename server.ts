@@ -146,15 +146,19 @@ app.get('/api/adam-character-image', async (_req, res) => {
 const overloadedModels = new Map<string, number>();
 
 function getHealthSortedModels(preferredModel: string): string[] {
+  // Gemini limits access to the 2.5 family for new API users. Keep production
+  // routing on current stable models instead of repeatedly retrying restricted IDs.
+  const restrictedModels = new Set(['gemini-2.5-flash', 'gemini-2.5-pro']);
   const defaults = [
     'gemini-3.8-flash',
     'gemini-4-argon',
     'gemini-flash-latest',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash-lite',
     'gemini-3.1-flash-lite',
-    'gemini-2.5-flash',
-    'gemini-2.5-pro',
   ];
-  const all = Array.from(new Set([preferredModel, ...defaults].filter(Boolean)));
+  const requested = preferredModel && !restrictedModels.has(preferredModel) ? [preferredModel] : [];
+  const all = Array.from(new Set([...requested, ...defaults].filter(Boolean)));
   const now = Date.now();
   const available = all.filter(m => (overloadedModels.get(m) || 0) <= now);
   const cooldowns = all.filter(m => (overloadedModels.get(m) || 0) > now);
