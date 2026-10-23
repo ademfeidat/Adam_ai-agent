@@ -1376,7 +1376,7 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
   });
 
   if (!currentApiKey && !isGatewayConfigured(req)) {
-    console.error('[Adam AI chat] No AI credential is available (Gemini key or Vercel AI Gateway OIDC)', {
+    console.error('[Adam AI chat] No AI credential is available (OpenRouter, Gemini, or Vercel AI Gateway)', {
       requestId,
       code: 'AI_NOT_CONFIGURED',
       status: 503,
