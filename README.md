@@ -47,6 +47,8 @@ PORT=3000
 
 OpenRouter is isolated in `server/openRouterProvider.ts`. It uses a server-side key, configurable model routing, optional model-level fallbacks, provider-side failover, and tool-enabled streaming for the main chat. If `OPENROUTER_API_KEY` is set, it takes priority for the main chat and is prioritized in agent runs; Gemini remains available for Gemini-specific features and as a fallback. OpenRouter usage may incur charges according to the selected model and account credits.
 
+Media generation is routed separately from chat: `GEMINI_API_KEY` with Veo access powers real asynchronous video generation (the API returns an operation ID, the Studio polls its status, and the download endpoint streams the finished MP4). Image generation tries native Gemini image models, then configured Hugging Face FLUX, then the public Pollinations image endpoint. OpenRouter is a chat/agent provider; an OpenRouter key alone does not enable Veo video generation. The app intentionally does not substitute a still image and label it as a video.
+
 Never commit `.env` or provider secrets. The browser and Android/iOS client must never embed `OPENROUTER_API_KEY` or `GEMINI_API_KEY`.
 
 ## Quality checks
