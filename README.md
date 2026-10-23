@@ -34,7 +34,7 @@ Optional server variables:
 
 ```env
 GEMINI_API_KEY=...
-ADAM_GEMINI_MODEL=gemini-3.7-flash
+ADAM_GEMINI_MODEL=gemini-3.8-flash
 PORT=3000
 ```
 
