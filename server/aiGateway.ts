@@ -3,7 +3,6 @@ import { AgentPermissionGuard } from './security/agentPermissions';
 import {
   getOpenRouterApiKey,
   getOpenRouterModelChain,
-  isOpenRouterConfigured,
   OPENROUTER_CHAT_URL,
 } from './openRouterProvider';
 
