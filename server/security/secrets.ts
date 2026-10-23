@@ -110,7 +110,7 @@ class SecretsManager {
 
     const forbiddenKeys = new Set([
       'apikey', 'api_key', 'token', 'secret', 'password', 'privatekey', 'private_key',
-      'gemini_api_key', 'hf_token', 'huggingface_api_key', 'authorization', 'cookie'
+      'gemini_api_key', 'openrouter_api_key', 'openrouterapikey', 'hf_token', 'huggingface_api_key', 'authorization', 'cookie'
     ]);
 
     const result: Record<string, any> = {};
