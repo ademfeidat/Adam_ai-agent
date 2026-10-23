@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Build web app
-        run: npm run build
+        run: CAPACITOR_BUILD=true npm run build
       - name: Add Android platform
         run: |
           if [ ! -d android ]; then npx cap add android; fi
