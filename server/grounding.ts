@@ -134,15 +134,17 @@ export function getDynamicSystemContext(language: 'ar' | 'en' | 'fr' | string = 
 - الوقت الحالي: ${arTimeFormatted} (ISO: ${isoDate})
 - توجيه إلزامي صارم لليوم وتاريخ اليوم (MANDATORY TODAY DIRECTIVE):
   * عندما يسألك المستخدم عن "اليوم" أو "تاريخ اليوم" أو "ما هو اليوم" أو "اليوم ايه"، أجب مباشرة بدقة متناهية وبساطة مطلقة معتمداً على التاريخ المحدد أعلاه: "${arDateFormatted}م${hijriPart}". لا تخمّن ولا تؤجل الإجابة، واذكر اليوم والتاريخ فوراً بإيجاز ووضوح.
-- توجيه إلزامي للأسئلة العامة والمعلومات من الشبكة (WEB GROUNDING & KNOWLEDGE DIRECTIVE):
-  * عندما يسألك المستخدم عن أي موضوع أو حقيقة أو استفسار عام آخر، قدّم إجابة صحيحة، بسيطة، مباشرة، ومستندة إلى معلومات موثوقة من الشبكة بدون أي تعقيد أو حشو غير ضروري.`;
+- محرك المعرفة الشاملة والبحث اللحظي في شبكة الويب وتاريخ الإنترنت (LIVE & HISTORICAL INTERNET GROUNDING):
+  * أنت متصل لحظياً بشبكة الإنترنت العالمية وبأرشيف المعارف الرقمية منذ نشأة شبكة الإنترنت (ARPANET 1969، إطلاق شبكة الويب العالمية WWW 1989/1991، وتطور التقنية والعلوم والتاريخ البشري حتى اللحظة الراهنة).
+  * في كل سؤال أو موضوع، استند إلى تدعيم البحث الحي (Google Search Grounding) والمعارف الأرشيفية الموثقة لتقديم إجابة حاسمة، دقيقة، عميقة، ومباشرة.
+  * لا تخترع أو تخمّن؛ دمج الحقائق المعاصرة مع العمق التاريخي لتقديم معرفة رقمية متكاملة للمستخدم.`;
   }
 
   return `\n\nDYNAMIC REAL-TIME SYSTEM CLOCK & GROUNDING:
 - Current Date: ${enDateFormatted}
 - Current ISO Time: ${isoDate} (${enTimeFormatted})
 - Mandatory Directive: Always rely on the provided 'Current Date' context when answering questions about today, the present time, or current year. Answer directly, clearly, and concisely.
-- Knowledge Grounding: When answering general questions about the world, provide accurate, simple, and direct answers based on verified web knowledge without unnecessary fluff.`;
+- Live & Historical Internet Grounding: You are directly grounded in the real-time internet index and historical web archives dating back to the inception of the internet (ARPANET 1969, CERN WWW 1989, and all digitized human knowledge). Ground every fact, event, and analysis with verified, hallucination-free knowledge.`;
 }
 
 export function cleanSearchQuery(query: string): string {

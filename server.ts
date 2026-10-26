@@ -43,6 +43,7 @@ import { buildGuardianReport } from './server/guardian';
 import { isGatewayConfigured, streamGatewayChat } from './server/aiGateway';
 import { getOpenRouterModel, isOpenRouterConfigured } from './server/openRouterProvider';
 import { detectMessageLanguage } from './src/core/utils/languageDetector';
+import { checkSupabaseHealth, getSupabaseClient } from './server/supabase';
 
 // Process-level shields against unexpected crashes and unhandled promise rejections
 process.on('uncaughtException', (err: any) => {
@@ -129,6 +130,15 @@ app.get('/api/guardian', (req, res) => {
 
 app.get('/api/ping', (_req, res) => {
   res.json({ ok: true, pong: Date.now() });
+});
+
+app.get('/api/supabase/status', async (_req, res) => {
+  try {
+    const health = await checkSupabaseHealth();
+    res.json({ ok: true, ...health });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err?.message || 'Failed to check Supabase status' });
+  }
 });
 
 app.get('/api/adam-character-image', async (_req, res) => {
@@ -1471,9 +1481,9 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
 
     const isToday = isTodayDateQuery(userPrompt);
 
-    // Fetch live web knowledge only when specifically needed for real-time external data (to keep response TTFT under 300ms)
+    // Automatic Live & Historical Web Search Grounding for all questions (except pure greetings/today clock)
     let webGrounding: { sources: GroundingSource[]; knowledgeContext: string; queries: string[] } = { sources: [], knowledgeContext: '', queries: [] };
-    const needsWebSearch = !isToday && !isConversationalQuery(userPrompt) && /(?:أخبار|اخبار|سعر|أسعار|الطقس|طقس|ابحث عن|بحث عن|من هو|من هي|نتائج|ترتيب|مباراة|مباريات|عملة|سهم|أسهم|latest|news|weather|price|search|current|today's|who is|stock|crypto)/i.test(userPrompt);
+    const needsWebSearch = !isToday && !isConversationalQuery(userPrompt);
     if (needsWebSearch) {
       try {
         webGrounding = await fetchLiveWebKnowledge(userPrompt, language);

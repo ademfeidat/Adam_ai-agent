@@ -100,13 +100,13 @@ function classifyTaskType(prompt: string, routeIntent?: string, isAr = false): {
   if (routeIntent === 'web' || p.includes('بحث') || p.includes('search') || p.includes('google') || p.includes('أخبار')) {
     return {
       taskType: 'search',
-      defaultStage: isAr ? '1/3 جاري فحص واسترجاع النتائج الحية من فهرس Google…' : '1/3 Querying live Google Search index…',
+      defaultStage: isAr ? '1/3 ربط مباشر ببحث Google وأرشيف الإنترنت المعرفي…' : '1/3 Live Google Search & historical archive grounding…',
       steps: 3,
     };
   }
   return {
-    taskType: 'chat',
-    defaultStage: isAr ? '1/3 جاري التحليل وصياغة الاستجابة…' : '1/3 Analyzing prompt & constructing verified response…',
+    taskType: 'search',
+    defaultStage: isAr ? '1/3 ربط مباشر وتدقيق عبر شبكة الويب والأرشيف المعرفي…' : '1/3 Grounding with live web & historical archives…',
     steps: 3,
   };
 }

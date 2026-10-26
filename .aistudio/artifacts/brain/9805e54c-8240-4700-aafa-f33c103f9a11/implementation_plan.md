@@ -1,32 +1,51 @@
-# Implementation Plan - Bulletproof Engine Reinforcement & Self-Healing Architecture
+# خطة تنفيذ: ربط وتدريب الموديل بكافة معارف الإنترنت الحية والتاريخية (Live & Historical Internet Grounding)
 
-## User Request
-- Fix and strengthen all core engines so they never fail from stability issues or network errors.
-- Implement advanced error suppression and self-healing error recovery across AI chat, image/media generation, and 3D arcade engines.
+بناءً على اختيارك لتفعيل **البحث اللحظي في الإنترنت تلقائياً لكل سؤال** و**ربط الموديل بمحرك بحث وبحث تاريخي مباشر مع تدعيم النتائج**، تهدف هذه الخطة إلى ترقية بنية ADEM AI ليصبح موصولاً لحظياً بكل ما نشر ويُنشر على شبكة الإنترنت منذ نشأتها وحتى اللحظة الراهنة.
 
 ---
 
-## Proposed Changes
+## 1. المعمارية الفنية المقترحة (Architecture Overview)
 
-### 1. Robust AI Client & Chat Engine (`src/core/ai/client.ts` & `server/agent.ts`)
-- Implement automatic exponential backoff retry logic with jitter for all API requests to Gemini/Vertex AI.
-- Add robust local fallback responses and graceful error handling so the chat never stalls or throws unhandled promise rejections on network drops or rate limits.
-- Enhance prompt routing and error recovery in `server/agent.ts` to ensure flawless image generation and tool execution.
+### أ. تفعيل البحث اللحظي التلقائي (Always-On Real-Time Google Search Grounding)
+- **الوضع الحالي:** كان البحث في الإنترنت يعمل بانتقائية مشروطة بكلمات مفتاحية معينة (مثل "أخبار"، "سعر"، "الطقس").
+- **التطوير الجديد:** جعل أداة البحث المباشر `{ googleSearch: {} }` مفعّلة تلقائياً وإلزامياً لكل استفسار وسؤال بدون استثناء، مما يربط كل عملية توليد للموديل بشبكة الإنترنت الحية وبأكبر قاعدة بيانات معرفية في العالم.
 
-### 2. Self-Healing Media & Image Generation Engine (`server/mediaEngine.ts`)
-- Add bulletproof fallback layers for image generation (Flux.1 Pro, Poll, and SVG fallback generators) so an image request never returns a blank screen or raw error stack.
-- Implement automatic timeout handlers and retry wrappers for image and video synthesis APIs.
+### ب. محرك استدعاء الأرشيف التاريخي والمعارف منذ نشأة الإنترنت (Historical & Archival Synthesis)
+- تزويد المحرك بدوال متخصصة في `server/grounding.ts` لاستخراج وتوثيق المحطات التاريخية والأرشيفية للإنترنت والعلوم والمعارف منذ بدايات شبكة ARPANET (1969) ومشروع WWW في CERN (1989) وحتى التطورات التقنية الحالية.
+- صياغة موجهات نظام متقدمة لـ ADEM تضمن التدقيق المتقاطع (Cross-Verification) للمعلومات التاريخية والحديثة بالاستناد إلى مخرجات البحث الحي.
 
-### 3. Bulletproof 3D Arcade & Three.js Engine (`src/features/arcade/` or 3D components)
-- Implement robust WebGL context loss detection and automatic canvas recovery.
-- Provide a clean 2D Canvas fallback mode when WebGL is unsupported or encounters context creation failures, ensuring the arcade engine never crashes the UI.
-
-### 4. Global UI Error Boundary & Self-Healing Resilience (`src/App.tsx` or `src/components/`)
-- Add an application-wide Error Boundary with a patent-themed self-healing recovery button ("إعادة ضبط المحرك / Engine Self-Healing Reboot") to instantly restore app state upon any unexpected exception.
+### ج. واجهة مستخدم توضح حالة الاتصال الحي بالإنترنت وتوثيق النتائج (Live Grounding HUD)
+- إضافة مؤشر بصري دقيق في واجهة المحادثة يوضح حالة "البحث اللحظي في شبكة الويب" ومصادر المعرفة المسترجعة.
+- الالتزام التام بمعايير التصميم الخالي من المظاهر الرخيصة (Anti-AI Slop) والاعتماد على خطوط واضحة وأرقام جدولية (`tabular-nums`) وتكامل هادئ وراقٍ داخل الشريط العلوي وواجهة المحادثة.
 
 ---
 
-## Verification Plan
-- Compile and build applet (`compile_applet`) to ensure zero syntax or type errors.
-- Run linter (`lint_applet`).
-- Verify self-healing resilience across chat, media generation, and 3D engines.
+## 2. تفاصيل الخطوات البرمجية ومسارات التعديل (Implementation Steps)
+
+### الخطوة 1: ضبط المحرك الخلفي للبحث التلقائي في الخادم (`server.ts` و `server/agent.ts`)
+- تعديل مصفوفة الإعدادات `configsToTry` في مسار المحادثة الرئيسي `/api/chat` وفي وحدة `server/agent.ts` لتكون الأولوية الدائمة والمطلقة لمحرك البحث الحي `{ googleSearch: {} }` لجميع الاستفسارات.
+- إلغاء شرط حصر البحث على الكلمات الدلالية فقط، ليصبح الاتصال بشبكة الإنترنت ميزة افتراضية دائمة.
+- إضافة آليات تعافٍ تلقائي (Circuit Breaker & Fallback) فائقة السرعة تضمن عدم تأثر سرعة الرد حتى في حال وجود بطء في الاتصال الخارجي.
+
+### الخطوة 2: توسيع معالج البحث المعرفي والأرشيفي (`server/grounding.ts`)
+- ترقية دالة `fetchLiveWebKnowledge` لدعم البحث الأرشيفي والتاريخي متعدد المحطات.
+- تضمين سياق تاريخي منظم في `dynamicContext` يُمكّن الموديل من ربط الأحداث القديمة بتداعياتها الحالية على نحو استدلالي عميق.
+
+### الخطوة 3: تحديث وتنسيق واجهة المحادثة (`src/features/chat/Chat.tsx`)
+- إبراز حالة الاتصال المباشر بالإنترنت ومصادر البحث المعتمدة في واجهة الردود بدون روابط مشتتة أو بطاقات منفرة.
+- توفير خيار تحكم سلس للمستخدم في شريط الأدوات يتيح له معاينة عمق البحث والتأكد من حداثة المعارف.
+
+### الخطوة 4: التحقق والاختبار الشامل (Verification & Quality Assurance)
+- فحص الترجمة البرمجية عبر `compile_applet` و `lint_applet` لضمان خلو المشروع من أي خطأ نوعي أو بنيوي.
+- اختبار استفسارات معاصرة جداً (أحداث اليوم والساعة) واستفسارات تاريخية قديمة للتحقق من تدعيم النتائج بدقة 100%.
+
+---
+
+## 3. خطة التحقق والاختبار (Verification Plan)
+
+| رقم الاختبار | نوع الاختبار | المعايير المتوقعة للنجاح |
+|---|---|---|
+| **TEST-01** | سؤال عن أحداث لحظية آنية | تنفيذ بحث جوجل الحي تلقائياً وتوليد إجابة دقيقة ومدعومة بالكامل. |
+| **TEST-02** | سؤال تاريخي عن نشأة الإنترنت والتقنية | استحضار التواريخ والمعارف الأرشيفية بدقة استدلالية وتاريخية فائقة. |
+| **TEST-03** | فحص جودة الواجهة وتناسقها | عمل المؤشرات البصرية بسلاسة مع التزام تام بمعايير التصميم الراقية. |
+| **TEST-04** | فحص استقرار الخادم والأداء | سرعة استجابة فائقة (Low Latency) بدون انقطاع أو أعطال. |

@@ -643,10 +643,9 @@ function createGeminiInvoker(apiKey: string, language: 'ar' | 'en', agentName: s
     const isToday = isTodayDateQuery(promptText);
 
     // When native Google Search grounding is active, Gemini handles real-time web retrieval directly.
-    // Supplementary web knowledge is only fetched if native search is unavailable.
     let webGrounding: { sources: GroundingSource[]; knowledgeContext: string; queries: string[] } = { sources: [], knowledgeContext: '', queries: [] };
     const canTryNativeSearch = useSearch && searchCircuitBreaker.isAvailable() && !isToday;
-    const needsWebSearch = useSearch && !isToday && !canTryNativeSearch && !isConversationalQuery(promptText) && /(?:أخبار|اخبار|سعر|أسعار|الطقس|طقس|ابحث عن|بحث عن|من هو|من هي|نتائج|ترتيب|مباراة|مباريات|عملة|سهم|أسهم|latest|news|weather|price|search|current|today's|who is|stock|crypto)/i.test(promptText);
+    const needsWebSearch = useSearch && !isToday && !canTryNativeSearch && !isConversationalQuery(promptText);
     if (needsWebSearch) {
       try {
         webGrounding = await fetchLiveWebKnowledge(promptText, language);
