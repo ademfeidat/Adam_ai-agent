@@ -71,6 +71,14 @@ export async function listUserConversations(userId: string): Promise<PersistedCo
 export async function saveUserConversation(userId: string, conversation: PersistedConversation): Promise<void> {
   if (!conversation.id || conversation.id.length > 128) throw new Error('INVALID_CONVERSATION_ID');
   const db = client();
+  const { data: existing, error: lookupError } = await db
+    .from('adam_conversations')
+    .select('user_id')
+    .eq('id', conversation.id)
+    .maybeSingle();
+  if (lookupError) throw lookupError;
+  if (existing && existing.user_id !== userId) throw new Error('CONVERSATION_OWNERSHIP_MISMATCH');
+
   const now = new Date().toISOString();
   const createdAt = new Date(conversation.createdAt || Date.now()).toISOString();
   const updatedAt = new Date(conversation.updatedAt || Date.now()).toISOString();
