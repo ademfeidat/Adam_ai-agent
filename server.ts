@@ -24,6 +24,7 @@ import { securityHeadersMiddleware, corsMiddleware, validateFileSecurity } from 
 import { globalRateLimiter, chatRateLimiter, mediaRateLimiter, authRateLimiter, agentRateLimiter, loginBruteForceLimiter } from './server/security/rateLimiter';
 import { signSessionToken } from './server/security/auth';
 import { verifyFirebaseIdentity } from './server/security/firebaseIdentity';
+import firebaseConfig from './firebase-applet-config.json';
 import { PromptInjectionGuard } from './server/security/promptInjection';
 import { AgentPermissionGuard } from './server/security/agentPermissions';
 import { humanApprovalManager } from './server/security/humanApproval';
@@ -773,7 +774,8 @@ app.post('/api/auth/login', loginBruteForceLimiter.middleware(), async (req, res
     // Firebase Web API keys are public identifiers, but must be configured server-side
     // so the backend can verify the ID token with Firebase Identity Toolkit.
     const firebaseApiKey = process.env.FIREBASE_WEB_API_KEY?.trim()
-      || process.env.VITE_FIREBASE_API_KEY?.trim();
+      || process.env.VITE_FIREBASE_API_KEY?.trim()
+      || firebaseConfig.apiKey?.trim();
     if (!firebaseApiKey) {
       return res.status(503).json({
         ok: false,
