@@ -17,7 +17,7 @@
     "build:apk": "CAPACITOR_BUILD=true npm run build && npx cap sync android && cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon",
     "build:apk:debug": "CAPACITOR_BUILD=true npm run build && npx cap sync android && cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon",
     "open:android": "npx cap open android",
-    "test:ci": "node --import tsx --test tests/chat-errors.test.js"
+    "test:ci": "npm test"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
