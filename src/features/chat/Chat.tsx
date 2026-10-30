@@ -829,7 +829,6 @@ export function Chat({
         };
         saveConversation(localSavedConv);
         void persistConversationToServer(localSavedConv);
-        void persistConversationToServer(localSavedConv);
         setCurrentConversation(localSavedConv);
         setConversations(loadAllConversations());
 
@@ -873,6 +872,7 @@ export function Chat({
           updatedAt: Date.now(),
         };
         saveConversation(localSavedConv);
+        void persistConversationToServer(localSavedConv);
         setCurrentConversation(localSavedConv);
         setConversations(loadAllConversations());
 
