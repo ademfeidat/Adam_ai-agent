@@ -23,6 +23,7 @@ import { authenticateSession, requirePermission, requireRole } from './server/se
 import { securityHeadersMiddleware, corsMiddleware, validateFileSecurity } from './server/security/networkShield';
 import { globalRateLimiter, chatRateLimiter, mediaRateLimiter, authRateLimiter, agentRateLimiter, loginBruteForceLimiter } from './server/security/rateLimiter';
 import { signSessionToken } from './server/security/auth';
+import { verifyFirebaseIdentity } from './server/security/firebaseIdentity';
 import { PromptInjectionGuard } from './server/security/promptInjection';
 import { AgentPermissionGuard } from './server/security/agentPermissions';
 import { humanApprovalManager } from './server/security/humanApproval';
@@ -756,31 +757,59 @@ app.get('/api/auth/session', (req, res) => {
   });
 });
 
-// Protected Login with Brute-Force Rate Limiting (5 attempts / 5 mins per IP)
+// Firebase-verified login. Client-supplied email/profile fields are never identity proof.
 app.post('/api/auth/login', loginBruteForceLimiter.middleware(), async (req, res) => {
   try {
-    const { email, password, provider = 'direct', idToken } = req.body || {};
-    
-    // Direct or Firebase token verification
-    if (!email && !idToken) {
-      return res.status(400).json({
+    const idToken = typeof req.body?.idToken === 'string' ? req.body.idToken.trim() : '';
+    if (!idToken || idToken.length > 12_000) {
+      return res.status(401).json({
         ok: false,
-        code: 'CREDENTIALS_REQUIRED',
-        messageAr: 'يرجى تقديم بيانات الدخول الصحيحة (البريد الإلكتروني أو رمز التحقق).',
-        messageEn: 'Please provide valid credentials (email or verification token).',
+        code: 'FIREBASE_ID_TOKEN_REQUIRED',
+        messageAr: 'يلزم تسجيل الدخول بحساب موثّق.',
+        messageEn: 'A verified sign-in token is required.',
       });
     }
 
-    // Sanitize and normalize identifier
-    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : undefined;
-    const uid = normalizedEmail ? `user_${Buffer.from(normalizedEmail).toString('base64url').slice(0, 24)}` : `user_${Date.now()}`;
-    const role = normalizedEmail === 'ademfeidat@gmail.com' ? 'admin' : 'user';
+    // Firebase Web API keys are public identifiers, but must be configured server-side
+    // so the backend can verify the ID token with Firebase Identity Toolkit.
+    const firebaseApiKey = process.env.FIREBASE_WEB_API_KEY?.trim()
+      || process.env.VITE_FIREBASE_API_KEY?.trim();
+    if (!firebaseApiKey) {
+      return res.status(503).json({
+        ok: false,
+        code: 'AUTH_PROVIDER_NOT_CONFIGURED',
+        message: 'Authentication provider is not configured.',
+      });
+    }
+
+    const identity = await verifyFirebaseIdentity(idToken, firebaseApiKey);
+    if (!identity) {
+      auditLogger.log({
+        userId: 'unknown',
+        ip: req.ip || 'unknown',
+        action: 'USER_LOGIN_FAILED',
+        resource: '/api/auth/login',
+        outcome: 'DENIED',
+        riskScore: 45,
+      });
+      return res.status(401).json({ ok: false, code: 'INVALID_ID_TOKEN', message: 'Invalid or expired sign-in token.' });
+    }
+
+    const normalizedEmail = identity.email?.trim().toLowerCase();
+    const configuredAdmins = (process.env.ADMIN_EMAILS || 'ademfeidat@gmail.com')
+      .split(',')
+      .map(value => value.trim().toLowerCase())
+      .filter(Boolean);
+    const role = identity.emailVerified && normalizedEmail && configuredAdmins.includes(normalizedEmail)
+      ? 'admin'
+      : 'user';
+    const uid = identity.uid;
 
     const token = signSessionToken({
       uid,
       role,
       email: normalizedEmail,
-      displayName: normalizedEmail ? normalizedEmail.split('@')[0] : 'User',
+      displayName: identity.displayName || normalizedEmail?.split('@')[0] || 'User',
       isAnonymous: false,
       exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
     });
@@ -794,7 +823,7 @@ app.post('/api/auth/login', loginBruteForceLimiter.middleware(), async (req, res
       action: 'USER_LOGIN_SUCCESS',
       resource: '/api/auth/login',
       outcome: 'SUCCESS',
-      riskScore: 10,
+      riskScore: 5,
     });
 
     return res.json({
@@ -803,13 +832,17 @@ app.post('/api/auth/login', loginBruteForceLimiter.middleware(), async (req, res
         uid,
         role,
         email: normalizedEmail,
-        displayName: normalizedEmail ? normalizedEmail.split('@')[0] : 'User',
+        displayName: identity.displayName || normalizedEmail?.split('@')[0] || 'User',
         isAnonymous: false,
       },
-      token,
     });
   } catch (err: any) {
-    return res.status(500).json({ ok: false, error: 'LOGIN_FAILED', message: err?.message || 'Authentication failed' });
+    const unavailable = err?.message === 'FIREBASE_IDENTITY_UNAVAILABLE';
+    return res.status(unavailable ? 503 : 500).json({
+      ok: false,
+      code: unavailable ? 'AUTH_PROVIDER_UNAVAILABLE' : 'LOGIN_FAILED',
+      message: unavailable ? 'Authentication provider is temporarily unavailable.' : 'Authentication failed.',
+    });
   }
 });
 
