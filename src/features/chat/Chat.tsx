@@ -829,6 +829,7 @@ export function Chat({
         };
         saveConversation(localSavedConv);
         void persistConversationToServer(localSavedConv);
+        void persistConversationToServer(localSavedConv);
         setCurrentConversation(localSavedConv);
         setConversations(loadAllConversations());
 
