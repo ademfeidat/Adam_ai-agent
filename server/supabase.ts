@@ -5,6 +5,25 @@ const supabaseKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_PUBL
 const supabaseJwksUrl = process.env.SUPABASE_JWKS_URL || 'https://xmbzxitenfaehjrycege.supabase.co/auth/v1/.well-known/jwks.json';
 
 let supabaseInstance: SupabaseClient | null = null;
+let supabaseAdminInstance: SupabaseClient | null = null;
+
+/** Server-only client. Never falls back to a publishable/anon key for privileged writes. */
+export function getSupabaseAdminClient(): SupabaseClient | null {
+  const secretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secretKey || !supabaseUrl) return null;
+  if (!supabaseAdminInstance) {
+    try {
+      supabaseAdminInstance = createClient(supabaseUrl, secretKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      console.info('[Supabase] Initialized server-only admin client.');
+    } catch (err) {
+      console.error('[Supabase] Admin client initialization failed:', err);
+      supabaseAdminInstance = null;
+    }
+  }
+  return supabaseAdminInstance;
+}
 
 export function getSupabaseClient(): SupabaseClient | null {
   if (!supabaseInstance && supabaseUrl && supabaseKey) {

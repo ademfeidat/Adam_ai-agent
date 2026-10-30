@@ -47,6 +47,7 @@ import {
   loadConversation,
   saveConversation,
   loadAllConversations,
+  saveAllConversations,
   createNewConversation,
   deleteConversation,
   renameConversation,
@@ -73,6 +74,35 @@ import { useGeneration, type GenerationTaskType } from '../../core/generation';
 import { ChatHistoryDrawer } from './ChatHistoryDrawer';
 import { InfiniteMemoryModal } from './InfiniteMemoryModal';
 import { ChatSessionDrawer } from './ChatSessionDrawer';
+
+async function persistConversationToServer(conversation: ChatConversation): Promise<void> {
+  try {
+    const response = await fetch(`/api/conversations/${encodeURIComponent(conversation.id)}`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversation }),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(payload.error || `HTTP_${response.status}`);
+    }
+  } catch (error) {
+    // Local storage remains the offline/recovery fallback; remote sync can retry next save.
+    console.warn('[Supabase conversations] Remote save deferred:', error);
+  }
+}
+
+async function deleteConversationFromServer(id: string): Promise<void> {
+  try {
+    await fetch(`/api/conversations/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+  } catch (error) {
+    console.warn('[Supabase conversations] Remote delete deferred:', error);
+  }
+}
 
 function classifyTaskType(prompt: string, routeIntent?: string, isAr = false): { taskType: GenerationTaskType; defaultStage: string; steps: number } {
   const p = prompt.toLowerCase();
@@ -440,6 +470,57 @@ export function Chat({
   const [heroCategory, setHeroCategory] = useState<'featured' | 'code' | 'search' | 'media' | 'linux' | 'identity'>('featured');
 
   useEffect(() => {
+    let cancelled = false;
+    const restoreRemoteConversations = async () => {
+      try {
+        const response = await fetch('/api/conversations', { credentials: 'include' });
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (cancelled || !Array.isArray(payload.conversations)) return;
+        const local = loadAllConversations();
+        const merged = new Map(local.map((item) => [item.id, item]));
+        for (const row of payload.conversations) {
+          if (!row || typeof row.id !== 'string' || !Array.isArray(row.messages)) continue;
+          const remote: ChatConversation = {
+            id: row.id,
+            title: typeof row.title === 'string' ? row.title : 'New conversation',
+            createdAt: Number(row.createdAt) || Date.now(),
+            updatedAt: Number(row.updatedAt) || Date.now(),
+            messages: row.messages.filter((message: any) =>
+              message && typeof message.id === 'string' &&
+              ['user', 'assistant', 'system'].includes(message.role) &&
+              typeof message.content === 'string'
+            ).map((message: any) => ({
+              id: message.id,
+              role: message.role,
+              content: message.content,
+              createdAt: Number(message.createdAt) || Date.now(),
+              ...(Array.isArray(message.images) ? { images: message.images } : {}),
+              ...(message.metadata && typeof message.metadata === 'object' ? { metadata: message.metadata } : {}),
+            })),
+          };
+          const previous = merged.get(remote.id);
+          merged.set(remote.id, !previous || remote.updatedAt >= previous.updatedAt ? remote : previous);
+        }
+        const combined = [...merged.values()].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 50);
+        saveAllConversations(combined);
+        setConversations(combined);
+        const active = combined.find((item) => item.id === currentConversation.id);
+        if (active && active.updatedAt >= currentConversation.updatedAt) {
+          setCurrentConversation(active);
+          setMessages(active.messages);
+        }
+      } catch (error) {
+        console.warn('[Supabase conversations] Restore deferred:', error);
+      }
+    };
+    restoreRemoteConversations();
+    return () => { cancelled = true; };
+  }, []);
+
+
+
+  useEffect(() => {
     const handleOpenSession = () => {
       setMemoryStats(getInfiniteMemoryStats());
       setIsSessionDrawerOpen(true);
@@ -588,6 +669,7 @@ export function Chat({
 
   const handleDeleteConversation = (id: string) => {
     const { remaining, nextActiveId } = deleteConversation(id);
+    void deleteConversationFromServer(id);
     setConversations(remaining);
     if (currentConversation.id === id) {
       const nextConv = loadConversation(undefined, nextActiveId);
@@ -746,6 +828,7 @@ export function Chat({
           updatedAt: Date.now(),
         };
         saveConversation(localSavedConv);
+        void persistConversationToServer(localSavedConv);
         setCurrentConversation(localSavedConv);
         setConversations(loadAllConversations());
 
@@ -789,6 +872,7 @@ export function Chat({
           updatedAt: Date.now(),
         };
         saveConversation(localSavedConv);
+        void persistConversationToServer(localSavedConv);
         setCurrentConversation(localSavedConv);
         setConversations(loadAllConversations());
 
@@ -829,6 +913,7 @@ export function Chat({
         updatedAt: Date.now(),
       };
       saveConversation(finalSavedConv);
+      void persistConversationToServer(finalSavedConv);
       setCurrentConversation(finalSavedConv);
       setConversations(loadAllConversations());
 
