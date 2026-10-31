@@ -2,7 +2,7 @@
 
 ## Android signing key incident
 
-A signing keystore was present at `android/app/release.keystore` in the repository tree. It has been removed from the working branch and matching keystore extensions are now ignored by Git.
+A signing keystore was present at `android/app/release.keystore` in the repository tree. It has been removed from the working branch and matching keystore extensions are now ignored by Git. The Android Gradle release configuration also previously contained hardcoded signing passwords and could fall back to the debug signing key; those unsafe defaults have been removed. Release signing now requires all four values (`RELEASE_KEYSTORE_PATH`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`) from protected environment variables or local Gradle properties.
 
 **Important:** deleting a file from the latest commit does not erase it from Git history, forks, cached clones, or previously downloaded copies. Treat the signing key as potentially exposed.
 
