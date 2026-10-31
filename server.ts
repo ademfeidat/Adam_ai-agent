@@ -44,6 +44,7 @@ import { isGatewayConfigured, streamGatewayChat } from './server/aiGateway';
 import { getOpenRouterModel, isOpenRouterConfigured } from './server/openRouterProvider';
 import { detectMessageLanguage } from './src/core/utils/languageDetector';
 import { checkSupabaseHealth, getSupabaseClient } from './server/supabase';
+import { registerDiagnosticRoutes } from './server/routes/diagnosticRoutes';
 import { deleteUserConversation, listUserConversations, saveUserConversation } from './server/supabaseConversations';
 
 // Process-level shields against unexpected crashes and unhandled promise rejections
@@ -102,44 +103,16 @@ app.use('/api', (req, res, next) => {
 });
 app.use('/api', globalRateLimiter.middleware());
 
-// Fast Health & Ping for Mobile APK & Web Connectivity Probing
-app.get('/api/health', (_req, res) => {
-  res.json({
-    ok: true,
-    status: 'online',
-    agent: 'ADEM',
-    configured: Boolean(secretsManager.getGeminiApiKey()) || isOpenRouterConfigured() || isGatewayConfigured(),
-    agentic: true,
-    provider: isOpenRouterConfigured() ? 'openrouter' : (process.env.AI_GATEWAY_API_KEY?.trim() ? 'vercel-ai-gateway' : 'gemini'),
-    model: isOpenRouterConfigured() ? getOpenRouterModel() : model,
-    timestamp: Date.now(),
-  });
-});
-
-// Guardian endpoint: exposes safe, non-secret diagnostics for autonomous recovery workflows.
-app.get('/api/guardian', (req, res) => {
-  const report = buildGuardianReport({
-    geminiConfigured: Boolean(secretsManager.getGeminiApiKey()),
-    gatewayConfigured: isGatewayConfigured(req),
-    sessionSecretConfigured: Boolean(process.env.SESSION_SECRET?.trim()),
-    vercel: process.env.VERCEL === '1',
-    production: process.env.VERCEL_ENV === 'production',
-    model,
-  });
-  res.status(report.status === 'healthy' ? 200 : report.status === 'degraded' ? 200 : 503).json(report);
-});
-
-app.get('/api/ping', (_req, res) => {
-  res.json({ ok: true, pong: Date.now() });
-});
-
-app.get('/api/supabase/status', async (_req, res) => {
-  try {
-    const health = await checkSupabaseHealth();
-    res.json({ ok: true, ...health });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err?.message || 'Failed to check Supabase status' });
-  }
+// Diagnostics are registered after shared middleware so headers, sessions, redaction and limits remain consistent.
+registerDiagnosticRoutes(app, {
+  secretsManager,
+  isOpenRouterConfigured,
+  isGatewayConfigured,
+  getOpenRouterModel,
+  checkSupabaseHealth,
+  buildGuardianReport,
+  redactSecrets,
+  model,
 });
 
 // Server-owned conversation persistence. User ownership comes only from the signed session middleware.
