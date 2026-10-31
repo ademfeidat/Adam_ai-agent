@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from 'express';
+import type { GuardianInput, GuardianReport } from '../guardian';
 
 type DiagnosticRouteDependencies = {
   secretsManager: { getGeminiApiKey(): string | undefined };
@@ -6,7 +7,7 @@ type DiagnosticRouteDependencies = {
   isGatewayConfigured: (req?: Request) => boolean;
   getOpenRouterModel: () => string;
   checkSupabaseHealth: () => Promise<Record<string, unknown>>;
-  buildGuardianReport: (options: Record<string, unknown>) => { status: string; [key: string]: unknown };
+  buildGuardianReport: (options: GuardianInput) => GuardianReport;
   redactSecrets: (value: string) => string;
   model: string;
 };
