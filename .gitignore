@@ -14,3 +14,16 @@ android/app/build/
 android/local.properties
 out/
 .vite/
+
+# Signing material and private certificates (never commit)
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+
+# Local tooling and generated diagnostics
+*.tsbuildinfo
+.nyc_output/
+playwright-report/
+test-results/

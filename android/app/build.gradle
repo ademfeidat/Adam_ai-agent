@@ -23,17 +23,18 @@ android {
             v2SigningEnabled true
         }
         release {
+            // Release signing material must be supplied through protected CI secrets
+            // or local Gradle properties. Never fall back to a committed keystore,
+            // hardcoded passwords, or the public debug certificate.
             def customKeystorePath = System.getenv("RELEASE_KEYSTORE_PATH") ?: project.findProperty("RELEASE_KEYSTORE_PATH")
-            if (file('release.keystore').exists()) {
-                storeFile file('release.keystore')
-                storePassword 'android123'
-                keyAlias 'adamkey'
-                keyPassword 'android123'
-            } else if (customKeystorePath && file(customKeystorePath).exists()) {
+            def storePass = System.getenv("RELEASE_STORE_PASSWORD") ?: project.findProperty("RELEASE_STORE_PASSWORD")
+            def aliasName = System.getenv("RELEASE_KEY_ALIAS") ?: project.findProperty("RELEASE_KEY_ALIAS")
+            def keyPass = System.getenv("RELEASE_KEY_PASSWORD") ?: project.findProperty("RELEASE_KEY_PASSWORD")
+            if (customKeystorePath && storePass && aliasName && keyPass) {
                 storeFile file(customKeystorePath)
-                storePassword(System.getenv("RELEASE_STORE_PASSWORD") ?: project.findProperty("RELEASE_STORE_PASSWORD") ?: "android")
-                keyAlias(System.getenv("RELEASE_KEY_ALIAS") ?: project.findProperty("RELEASE_KEY_ALIAS") ?: "androiddebugkey")
-                keyPassword(System.getenv("RELEASE_KEY_PASSWORD") ?: project.findProperty("RELEASE_KEY_PASSWORD") ?: "android")
+                storePassword storePass
+                keyAlias aliasName
+                keyPassword keyPass
             }
             v1SigningEnabled true
             v2SigningEnabled true
@@ -44,7 +45,9 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            signingConfig (signingConfigs.release.storeFile != null ? signingConfigs.release : signingConfigs.debug)
+            // A release build without explicit signing credentials must fail rather
+            // than produce an installable release signed with the debug key.
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
