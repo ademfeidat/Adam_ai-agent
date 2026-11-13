@@ -29,9 +29,7 @@ export function setupLiveApiWebSocket(server: http.Server) {
   wss.on('connection', async (clientWs: WebSocket, request: http.IncomingMessage) => {
     const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
     const requestedVoice = url.searchParams.get('voice') || 'Zephyr';
-    const queryApiKey = url.searchParams.get('apiKey');
-    const headerApiKey = request.headers['x-gemini-api-key'] as string | undefined;
-    const apiKey = queryApiKey || headerApiKey || secretsManager.getGeminiApiKey();
+    const apiKey = secretsManager.getGeminiApiKey();
 
     if (!apiKey) {
       if (clientWs.readyState === WebSocket.OPEN) {
