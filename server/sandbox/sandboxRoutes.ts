@@ -11,7 +11,6 @@ export const sandboxRouter = Router();
 sandboxRouter.post('/generate-app', async (req: Request, res: Response) => {
   try {
     const { prompt, category, language } = req.body || {};
-    const apiKeyHeader = req.headers['x-gemini-api-key'] as string;
 
     if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
       res.status(400).json({
@@ -26,7 +25,6 @@ sandboxRouter.post('/generate-app', async (req: Request, res: Response) => {
       prompt: prompt.trim(),
       category,
       language: language === 'en' ? 'en' : 'ar',
-      apiKey: apiKeyHeader,
     });
 
     res.json({ ok: true, app });
