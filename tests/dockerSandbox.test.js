@@ -82,8 +82,10 @@ test('DockerSandboxService handles compilation and execution errors cleanly', as
   const result = await dockerSandboxService.execute({
     language: 'javascript',
     code: 'throw new Error("Deliberate sandbox error test");',
+    // Allow Docker startup overhead on shared CI runners; the assertion is
+    // about application stderr, not whether the daemon can warm an image in 5s.
     limits: {
-      timeoutMs: 5000,
+      timeoutMs: 15000,
     },
   });
 

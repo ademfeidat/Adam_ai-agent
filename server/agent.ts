@@ -33,7 +33,7 @@ import { sanitizeAgentIdentity } from '../src/core/agent/responseSanitizer';
 import { buildHarnessPlan, formatHarnessInstruction, verifyHarnessOutput } from './ecc';
 import { huggingFaceEngine } from './huggingfaceEngine';
 import { detectMessageLanguage } from '../src/core/utils/languageDetector';
-import { completeOpenRouterChat, getOpenRouterModel, isOpenRouterConfigured } from './openRouterProvider';
+import { completeOpenRouterChat, createOpenRouterModelDescriptor, getOpenRouterModel, isOpenRouterConfigured } from './openRouterProvider';
 
 export function isExplicitImageRequest(prompt: string): boolean {
   const p = prompt.trim().toLowerCase();
@@ -1148,7 +1148,11 @@ export function registerAgentRoute(app: Express, apiKey: string, model: string) 
       const fallback = currentApiKey
         ? (modelRegistry.get(model) ?? modelRegistry.enabled().find(candidate => candidate.provider === 'gemini' || candidate.provider === 'ADEM-G'))
         : undefined;
-      const openRouterDescriptor = isOpenRouterConfigured() ? modelRegistry.get(getOpenRouterModel()) : undefined;
+      // Do not make OpenRouter availability depend on the optional remote catalog.
+      const openRouterModelId = getOpenRouterModel();
+      const openRouterDescriptor: ModelDescriptor | undefined = isOpenRouterConfigured()
+        ? modelRegistry.get(openRouterModelId) || createOpenRouterModelDescriptor()
+        : undefined;
       const candidates = [
         ...(openRouterDescriptor ? [openRouterDescriptor] : []),
         ...plan.ensemble.filter(candidate => candidate.id !== openRouterDescriptor?.id),

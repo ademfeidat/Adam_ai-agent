@@ -284,8 +284,12 @@ class DockerSandboxService {
       stderr += `\nDocker execution error: ${err.message}`;
       exitCode = 1;
     } finally {
-      // Ensure container is stopped/pruned if it got stuck
-      exec(`docker rm -f ${containerId}`, () => {});
+      // Finish container cleanup before returning. Fire-and-forget removal
+      // allowed the next sandbox run to race Docker's teardown, especially
+      // immediately after a timeout killed the docker CLI process.
+      await new Promise<void>((resolve) => {
+        exec(`docker rm -f ${containerId}`, { timeout: 5000 }, () => resolve());
+      });
     }
 
     const durationMs = Date.now() - startTime;

@@ -4,6 +4,8 @@
  * This module is server-only. OPENROUTER_API_KEY is never read by browser code
  * and is never returned by diagnostics or API responses.
  */
+import type { ModelDescriptor } from '../src/core/models/modelSwarm';
+
 export const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 export type OpenRouterMessage = {
@@ -44,6 +46,26 @@ export function getOpenRouterFallbackModels(): string[] {
 
 export function getOpenRouterModelChain(): string[] {
   return [getOpenRouterModel(), ...getOpenRouterFallbackModels()];
+}
+
+/**
+ * Builds a runtime descriptor for the explicitly configured OpenRouter model.
+ * This prevents agent routing from depending on the optional remote catalog
+ * containing a specific OpenRouter model ID.
+ */
+export function createOpenRouterModelDescriptor(): ModelDescriptor | undefined {
+  if (!getOpenRouterApiKey()) return undefined;
+  const id = getOpenRouterModel();
+  return {
+    id,
+    provider: 'openai-compatible',
+    displayName: `OpenRouter · ${id}`,
+    capabilities: ['general', 'reasoning', 'coding', 'math', 'vision', 'arabic'],
+    quality: 8,
+    speed: 8,
+    cost: 1,
+    enabled: true,
+  };
 }
 
 export async function completeOpenRouterChat(args: OpenRouterCompletionArgs): Promise<string> {
