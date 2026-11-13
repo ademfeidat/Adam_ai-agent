@@ -121,7 +121,7 @@ export async function listUserConversations(userId: string): Promise<PersistedCo
  * without requiring live Supabase credentials.
  */
 export async function saveUserConversationWithClient(
-  db: { rpc: (fn: string, args: Record<string, unknown>) => Promise<any> },
+  db: { rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<any> },
   userId: string,
   conversation: PersistedConversation,
 ): Promise<void> {
