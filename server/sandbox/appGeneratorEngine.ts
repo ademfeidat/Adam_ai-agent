@@ -6,7 +6,6 @@ export interface GenerateAppRequest {
   prompt: string;
   category?: 'game' | 'app' | 'tool';
   language?: 'ar' | 'en';
-  apiKey?: string;
 }
 
 export interface GeneratedAppResponse {
@@ -25,7 +24,7 @@ export class AppGeneratorEngine {
    * dynamically using Gemini 3.8 Flash, tailored precisely to the user's prompt.
    */
   public static async generateApp(req: GenerateAppRequest): Promise<GeneratedAppResponse> {
-    const rawApiKey = req.apiKey || secretsManager.getGeminiApiKey();
+    const rawApiKey = secretsManager.getGeminiApiKey();
     const prompt = (req.prompt || '').trim();
     const isAr = req.language !== 'en';
     const appId = `adem_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
