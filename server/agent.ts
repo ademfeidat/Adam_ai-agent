@@ -1148,7 +1148,22 @@ export function registerAgentRoute(app: Express, apiKey: string, model: string) 
       const fallback = currentApiKey
         ? (modelRegistry.get(model) ?? modelRegistry.enabled().find(candidate => candidate.provider === 'gemini' || candidate.provider === 'ADEM-G'))
         : undefined;
-      const openRouterDescriptor = isOpenRouterConfigured() ? modelRegistry.get(getOpenRouterModel()) : undefined;
+      // Always route to the explicitly configured OpenRouter model first.
+      // It is a valid server-side provider even when the optional remote model
+      // catalog has not hydrated or does not include this exact model ID.
+      const openRouterModelId = getOpenRouterModel();
+      const openRouterDescriptor: ModelDescriptor | undefined = isOpenRouterConfigured()
+        ? modelRegistry.get(openRouterModelId) || {
+            id: openRouterModelId,
+            provider: 'openai-compatible',
+            displayName: `OpenRouter · ${openRouterModelId}`,
+            capabilities: ['general', 'reasoning', 'coding', 'math', 'vision', 'arabic'],
+            quality: 8,
+            speed: 8,
+            cost: 1,
+            enabled: true,
+          }
+        : undefined;
       const candidates = [
         ...(openRouterDescriptor ? [openRouterDescriptor] : []),
         ...plan.ensemble.filter(candidate => candidate.id !== openRouterDescriptor?.id),
