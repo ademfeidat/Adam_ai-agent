@@ -24,7 +24,51 @@ function client(): SupabaseClient {
   return supabase;
 }
 
+function timestampToIso(value: unknown, fallback: number): string {
+  const timestamp = typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  const date = new Date(timestamp);
+  return Number.isNaN(date.getTime()) ? new Date(fallback).toISOString() : date.toISOString();
+}
+
+function toDatabaseMessages(conversationId: string, messages: PersistedMessage[]) {
+  const now = Date.now();
+  const selected = (Array.isArray(messages) ? messages : []).slice(-100);
+  const seenIds = new Set<string>();
+
+  return selected.map((message) => {
+    const id = typeof message?.id === 'string' ? message.id.trim() : '';
+    if (!id || id.length > 128) throw new Error('INVALID_MESSAGE_ID');
+    if (seenIds.has(id)) throw new Error('DUPLICATE_MESSAGE_ID');
+    seenIds.add(id);
+
+    if (!['user', 'assistant', 'system'].includes(message.role)) {
+      throw new Error('INVALID_MESSAGE_ROLE');
+    }
+
+    const metadata = message.metadata && typeof message.metadata === 'object' && !Array.isArray(message.metadata)
+      ? message.metadata
+      : {};
+
+    return {
+      id,
+      role: message.role,
+      content: String(message.content ?? '').slice(0, 100000),
+      metadata: {
+        images: (Array.isArray(message.images) ? message.images : [])
+          .filter((url): url is string => typeof url === 'string' && /^https:\/\//i.test(url))
+          .slice(0, 8),
+        messageMetadata: metadata,
+      },
+      created_at: timestampToIso(message.createdAt, now),
+    };
+  }).map((row) => ({
+    ...row,
+    conversation_id: conversationId,
+  }));
+}
+
 export async function listUserConversations(userId: string): Promise<PersistedConversation[]> {
+  if (!userId || userId.length > 256) throw new Error('INVALID_USER_ID');
   const db = client();
   const { data: conversations, error } = await db
     .from('adam_conversations')
@@ -68,50 +112,60 @@ export async function listUserConversations(userId: string): Promise<PersistedCo
   }));
 }
 
-export async function saveUserConversation(userId: string, conversation: PersistedConversation): Promise<void> {
-  if (!conversation.id || conversation.id.length > 128) throw new Error('INVALID_CONVERSATION_ID');
-  const db = client();
-  const { data: existing, error: lookupError } = await db
-    .from('adam_conversations')
-    .select('user_id')
-    .eq('id', conversation.id)
-    .maybeSingle();
-  if (lookupError) throw lookupError;
-  if (existing && existing.user_id !== userId) throw new Error('CONVERSATION_OWNERSHIP_MISMATCH');
+/**
+ * Persists a conversation through one database transaction. The database RPC
+ * locks the conversation and checks both conversation and message ownership
+ * before applying any upserts, preventing cross-user ID collisions.
+ *
+ * The client parameter is injectable so the RPC contract can be unit-tested
+ * without requiring live Supabase credentials.
+ */
+export async function saveUserConversationWithClient(
+  db: { rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<any> },
+  userId: string,
+  conversation: PersistedConversation,
+): Promise<void> {
+  if (!userId || userId.length > 256) throw new Error('INVALID_USER_ID');
+  if (!conversation || typeof conversation.id !== 'string' || !conversation.id.trim() || conversation.id.length > 128) {
+    throw new Error('INVALID_CONVERSATION_ID');
+  }
+  if (!Array.isArray(conversation.messages)) throw new Error('INVALID_CONVERSATION_MESSAGES');
 
-  const now = new Date().toISOString();
-  const createdAt = new Date(conversation.createdAt || Date.now()).toISOString();
-  const updatedAt = new Date(conversation.updatedAt || Date.now()).toISOString();
-
-  const { error: conversationError } = await db.from('adam_conversations').upsert({
-    id: conversation.id,
-    user_id: userId,
+  const conversationId = conversation.id.trim();
+  const now = Date.now();
+  const payload = {
+    id: conversationId,
     title: String(conversation.title || 'New conversation').slice(0, 120),
-    created_at: createdAt,
-    updated_at: updatedAt,
-  }, { onConflict: 'id' });
-  if (conversationError) throw conversationError;
+    created_at: timestampToIso(conversation.createdAt, now),
+    updated_at: timestampToIso(conversation.updatedAt, now),
+  };
+  const messages = toDatabaseMessages(conversationId, conversation.messages);
 
-  const rows = (conversation.messages || []).slice(-100).map((message) => ({
-    id: String(message.id).slice(0, 128),
-    conversation_id: conversation.id,
-    user_id: userId,
-    role: message.role,
-    content: String(message.content || '').slice(0, 100000),
-    metadata: {
-      images: (message.images || []).filter((url) => typeof url === 'string' && /^https:\/\//i.test(url)).slice(0, 8),
-      messageMetadata: message.metadata || {},
-    },
-    created_at: new Date(message.createdAt || Date.now()).toISOString(),
-  })).filter((row) => row.id && ['user', 'assistant', 'system'].includes(row.role));
+  const { error } = await db.rpc('adam_save_conversation', {
+    p_user_id: userId,
+    p_conversation: payload,
+    p_messages: messages,
+  });
 
-  if (rows.length) {
-    const { error: messageError } = await db.from('adam_messages').upsert(rows, { onConflict: 'id' });
-    if (messageError) throw messageError;
+  if (error) {
+    const message = String(error.message || '');
+    if (message.includes('CONVERSATION_OWNERSHIP_MISMATCH')) {
+      throw new Error('CONVERSATION_OWNERSHIP_MISMATCH');
+    }
+    if (message.includes('MESSAGE_OWNERSHIP_MISMATCH')) {
+      throw new Error('MESSAGE_OWNERSHIP_MISMATCH');
+    }
+    throw error;
   }
 }
 
+export async function saveUserConversation(userId: string, conversation: PersistedConversation): Promise<void> {
+  return saveUserConversationWithClient(client(), userId, conversation);
+}
+
 export async function deleteUserConversation(userId: string, conversationId: string): Promise<void> {
+  if (!userId || userId.length > 256) throw new Error('INVALID_USER_ID');
+  if (!conversationId || conversationId.length > 128) throw new Error('INVALID_CONVERSATION_ID');
   const { error } = await client().from('adam_conversations').delete().eq('id', conversationId).eq('user_id', userId);
   if (error) throw error;
 }
