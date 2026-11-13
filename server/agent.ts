@@ -33,7 +33,7 @@ import { sanitizeAgentIdentity } from '../src/core/agent/responseSanitizer';
 import { buildHarnessPlan, formatHarnessInstruction, verifyHarnessOutput } from './ecc';
 import { huggingFaceEngine } from './huggingfaceEngine';
 import { detectMessageLanguage } from '../src/core/utils/languageDetector';
-import { completeOpenRouterChat, getOpenRouterModel, isOpenRouterConfigured } from './openRouterProvider';
+import { completeOpenRouterChat, createOpenRouterModelDescriptor, getOpenRouterModel, isOpenRouterConfigured } from './openRouterProvider';
 
 export function isExplicitImageRequest(prompt: string): boolean {
   const p = prompt.trim().toLowerCase();
@@ -1148,21 +1148,10 @@ export function registerAgentRoute(app: Express, apiKey: string, model: string) 
       const fallback = currentApiKey
         ? (modelRegistry.get(model) ?? modelRegistry.enabled().find(candidate => candidate.provider === 'gemini' || candidate.provider === 'ADEM-G'))
         : undefined;
-      // Always route to the explicitly configured OpenRouter model first.
-      // It is a valid server-side provider even when the optional remote model
-      // catalog has not hydrated or does not include this exact model ID.
+      // Do not make OpenRouter availability depend on the optional remote catalog.
       const openRouterModelId = getOpenRouterModel();
       const openRouterDescriptor: ModelDescriptor | undefined = isOpenRouterConfigured()
-        ? modelRegistry.get(openRouterModelId) || {
-            id: openRouterModelId,
-            provider: 'openai-compatible',
-            displayName: `OpenRouter · ${openRouterModelId}`,
-            capabilities: ['general', 'reasoning', 'coding', 'math', 'vision', 'arabic'],
-            quality: 8,
-            speed: 8,
-            cost: 1,
-            enabled: true,
-          }
+        ? modelRegistry.get(openRouterModelId) || createOpenRouterModelDescriptor()
         : undefined;
       const candidates = [
         ...(openRouterDescriptor ? [openRouterDescriptor] : []),
