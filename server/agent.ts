@@ -958,7 +958,7 @@ export function registerAgentRoute(app: Express, apiKey: string, model: string) 
     const requestId = getRequestId(req);
     const runId = `run_${requestId}`;
     res.setHeader('X-Request-Id', requestId);
-    const currentApiKey = apiKey || secretsManager.getGeminiApiKey() || (req.headers['x-gemini-api-key'] as string) || '';
+    const currentApiKey = apiKey || secretsManager.getGeminiApiKey() || '';
     if (!currentApiKey && !isOpenRouterConfigured()) return sendError(res, 503, 'AI_NOT_CONFIGURED', 'Configure OPENROUTER_API_KEY or GEMINI_API_KEY in the server environment.');
     const messages = normalizeMessages(body.messages);
     if (!messages.length) return sendError(res, 400, 'EMPTY_MESSAGE', 'Please send a message before starting an agent run.');
