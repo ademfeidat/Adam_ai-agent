@@ -62,10 +62,9 @@ export async function requestTranslation(params: {
   targetLang: string;
   tone?: string;
   includeAnalysis?: boolean;
-  apiKey?: string;
   signal?: AbortSignal;
 }): Promise<TranslationResult> {
-  const { text, sourceLang, targetLang, tone = 'general', includeAnalysis = true, apiKey, signal } = params;
+  const { text, sourceLang, targetLang, tone = 'general', includeAnalysis = true, signal } = params;
 
   if (!text.trim()) {
     return { translatedText: '' };
@@ -77,7 +76,6 @@ export async function requestTranslation(params: {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(apiKey ? { 'x-gemini-api-key': apiKey } : {}),
       },
       body: JSON.stringify({
         text,

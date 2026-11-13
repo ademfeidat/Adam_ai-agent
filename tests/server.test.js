@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 process.env.NODE_ENV = 'test';
 process.env.GEMINI_API_KEY = '';
+// A browser-exposed VITE key must never satisfy server-side provider configuration.
+process.env.VITE_GEMINI_API_KEY = 'client-only-test-key';
 const { app } = await import('../server.ts');
 
 async function closeTestServer(server) {
@@ -28,7 +30,7 @@ test('chat endpoint returns a typed configuration error without provider credent
   const port = server.address().port;
   const response = await fetch(`http://127.0.0.1:${port}/api/chat`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'x-gemini-api-key': 'attacker-supplied-key' },
     body: JSON.stringify({ messages: [{ role: 'user', content: 'hello' }], language: 'en', agentName: 'Adam' }),
   });
   const body = await response.json();
