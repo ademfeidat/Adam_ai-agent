@@ -1345,7 +1345,7 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
   const requestStartedAt = Date.now();
   let aborted = false;
   res.setHeader('X-Request-Id', requestId);
-  const currentApiKey = apiKey || secretsManager.getGeminiApiKey() || (req.headers['x-gemini-api-key'] as string) || '';
+  const currentApiKey = apiKey || secretsManager.getGeminiApiKey() || '';
   console.info('[Adam AI chat] request started', { requestId, model: isOpenRouterConfigured() ? getOpenRouterModel() : model, hasGeminiApiKey: Boolean(currentApiKey), hasOpenRouterKey: isOpenRouterConfigured(), messageCount: Array.isArray(req.body?.messages) ? req.body.messages.length : 0 });
   res.once('close', () => {
     if (!res.writableFinished) aborted = true;
@@ -2323,7 +2323,11 @@ app.post('/api/unreal-engine/bridge', authenticateSession, requirePermission('ag
 app.post('/api/translate', chatRateLimiter.middleware(), async (req, res) => {
   try {
     const { text, sourceLang = 'auto', targetLang = 'en', tone = 'general', includeAnalysis = true } = req.body || {};
-    const customKey = (req.headers['x-gemini-api-key'] as string) || apiKey;
+    const customKey = apiKey;
+
+    if (!customKey) {
+      return res.status(503).json({ ok: false, error: 'AI_NOT_CONFIGURED' });
+    }
 
     if (!text || typeof text !== 'string' || !text.trim()) {
       return res.status(400).json({ ok: false, error: 'Text is required for translation' });
