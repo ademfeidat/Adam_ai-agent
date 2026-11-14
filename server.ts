@@ -162,7 +162,7 @@ app.put('/api/conversations/:id', requirePermission('chat:write'), async (req, r
     await saveUserConversation(req.user!.uid, conversation);
     res.json({ ok: true });
   } catch (err: any) {
-    const ownershipMismatch = err?.message === 'CONVERSATION_OWNERSHIP_MISMATCH';
+    const ownershipMismatch = ['CONVERSATION_OWNERSHIP_MISMATCH', 'MESSAGE_OWNERSHIP_MISMATCH'].includes(err?.message);
     console.error('[Supabase conversations] save failed:', redactSecrets(String(err?.message || err)));
     res.status(ownershipMismatch ? 403 : 503).json({ ok: false, error: ownershipMismatch ? 'CONVERSATION_ACCESS_DENIED' : 'CONVERSATION_STORAGE_UNAVAILABLE' });
   }
