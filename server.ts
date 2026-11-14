@@ -44,6 +44,7 @@ import { isGatewayConfigured, streamGatewayChat } from './server/aiGateway';
 import { getOpenRouterModel, isOpenRouterConfigured } from './server/openRouterProvider';
 import { detectMessageLanguage } from './src/core/utils/languageDetector';
 import { checkSupabaseHealth, getSupabaseClient } from './server/supabase';
+import { deleteUserConversation, listUserConversations, saveUserConversation } from './server/supabaseConversations';
 
 // Process-level shields against unexpected crashes and unhandled promise rejections
 process.on('uncaughtException', (err: any) => {
@@ -138,6 +139,42 @@ app.get('/api/supabase/status', async (_req, res) => {
     res.json({ ok: true, ...health });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: err?.message || 'Failed to check Supabase status' });
+  }
+});
+
+// Server-owned conversation persistence. User ownership comes only from the signed session middleware.
+app.get('/api/conversations', requirePermission('chat:read'), async (req, res) => {
+  try {
+    const conversations = await listUserConversations(req.user!.uid);
+    res.json({ ok: true, conversations });
+  } catch (err: any) {
+    console.error('[Supabase conversations] list failed:', redactSecrets(String(err?.message || err)));
+    res.status(503).json({ ok: false, error: 'CONVERSATION_STORAGE_UNAVAILABLE' });
+  }
+});
+
+app.put('/api/conversations/:id', requirePermission('chat:write'), async (req, res) => {
+  try {
+    const conversation = req.body?.conversation;
+    if (!conversation || typeof conversation !== 'object' || conversation.id !== req.params.id || !Array.isArray(conversation.messages)) {
+      return res.status(400).json({ ok: false, error: 'INVALID_CONVERSATION' });
+    }
+    await saveUserConversation(req.user!.uid, conversation);
+    res.json({ ok: true });
+  } catch (err: any) {
+    const ownershipMismatch = ['CONVERSATION_OWNERSHIP_MISMATCH', 'MESSAGE_OWNERSHIP_MISMATCH'].includes(err?.message);
+    console.error('[Supabase conversations] save failed:', redactSecrets(String(err?.message || err)));
+    res.status(ownershipMismatch ? 403 : 503).json({ ok: false, error: ownershipMismatch ? 'CONVERSATION_ACCESS_DENIED' : 'CONVERSATION_STORAGE_UNAVAILABLE' });
+  }
+});
+
+app.delete('/api/conversations/:id', requirePermission('chat:write'), async (req, res) => {
+  try {
+    await deleteUserConversation(req.user!.uid, req.params.id);
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error('[Supabase conversations] delete failed:', redactSecrets(String(err?.message || err)));
+    res.status(503).json({ ok: false, error: 'CONVERSATION_STORAGE_UNAVAILABLE' });
   }
 });
 
@@ -1308,7 +1345,7 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
   const requestStartedAt = Date.now();
   let aborted = false;
   res.setHeader('X-Request-Id', requestId);
-  const currentApiKey = apiKey || secretsManager.getGeminiApiKey() || (req.headers['x-gemini-api-key'] as string) || '';
+  const currentApiKey = apiKey || secretsManager.getGeminiApiKey() || '';
   console.info('[Adam AI chat] request started', { requestId, model: isOpenRouterConfigured() ? getOpenRouterModel() : model, hasGeminiApiKey: Boolean(currentApiKey), hasOpenRouterKey: isOpenRouterConfigured(), messageCount: Array.isArray(req.body?.messages) ? req.body.messages.length : 0 });
   res.once('close', () => {
     if (!res.writableFinished) aborted = true;
@@ -1321,7 +1358,7 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
       status: 503,
       durationMs: Date.now() - requestStartedAt,
     });
-    return sendError(res, 503, 'AI_NOT_CONFIGURED', 'No server-side AI provider is configured. Set OPENROUTER_API_KEY or GEMINI_API_KEY in the Vercel environment.');
+    return sendError(res, 503, 'AI_NOT_CONFIGURED', 'No server-side AI provider is configured. Set OPENROUTER_API_KEY, GEMINI_API_KEY, or AI_GATEWAY_API_KEY in the Vercel environment.');
   }
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body ?? {};
   const messages = normalizeMessages(body?.messages ?? body?.message ?? body?.prompt ?? body);

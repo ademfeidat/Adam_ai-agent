@@ -217,6 +217,7 @@ class DockerSandboxService {
       '--pids-limit=64',
       limits.networkEnabled ? '--network=bridge' : '--network=none',
       '--cap-drop=ALL',
+      '--env', `ADEM_SANDBOX_ID=${containerId}`,
       '--read-only',
       '--tmpfs', '/tmp:rw,noexec,nosuid,size=64m',
       '-v', `${tempDir}:/sandbox:ro`,

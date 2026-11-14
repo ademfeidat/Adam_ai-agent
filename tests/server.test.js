@@ -28,7 +28,7 @@ test('chat endpoint returns a typed configuration error without provider credent
   const port = server.address().port;
   const response = await fetch(`http://127.0.0.1:${port}/api/chat`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'x-gemini-api-key': 'client-controlled-invalid-key' },
     body: JSON.stringify({ messages: [{ role: 'user', content: 'hello' }], language: 'en', agentName: 'Adam' }),
   });
   const body = await response.json();

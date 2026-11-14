@@ -108,7 +108,8 @@ export default defineConfig(() => {
     ],
     build: {
       outDir: 'dist',
-      sourcemap: true,
+      // Do not publish browser source maps in production; server bundling keeps its own map.
+      sourcemap: false,
       cssCodeSplit: true,
       minify: 'esbuild',
       chunkSizeWarningLimit: 1500,
