@@ -24,6 +24,11 @@ function client(): SupabaseClient {
   return supabase;
 }
 
+function toIsoTimestamp(value: number | undefined, fallback: number): string {
+  const timestamp = Number(value);
+  return new Date(Number.isFinite(timestamp) && timestamp > 0 ? timestamp : fallback).toISOString();
+}
+
 export async function listUserConversations(userId: string): Promise<PersistedConversation[]> {
   const db = client();
   const { data: conversations, error } = await db
@@ -68,50 +73,89 @@ export async function listUserConversations(userId: string): Promise<PersistedCo
   }));
 }
 
+/**
+ * Client-generated IDs are globally unique database keys. Never use a plain
+ * upsert here: a conflicting ID must not transfer ownership to the caller.
+ * Insert-ignore plus owner-scoped updates makes retries safe and prevents an
+ * ID collision from overwriting another user's conversation or message.
+ */
 export async function saveUserConversation(userId: string, conversation: PersistedConversation): Promise<void> {
-  if (!conversation.id || conversation.id.length > 128) throw new Error('INVALID_CONVERSATION_ID');
+  if (!userId || !conversation.id || conversation.id.length > 128) throw new Error('INVALID_CONVERSATION_ID');
+  if (!Array.isArray(conversation.messages)) throw new Error('INVALID_CONVERSATION_MESSAGES');
+
+  const seenMessageIds = new Set<string>();
+  const rows = conversation.messages.slice(-100).map((message) => {
+    const id = typeof message.id === 'string' ? message.id.trim() : '';
+    if (!id || id.length > 128 || seenMessageIds.has(id)) throw new Error('INVALID_MESSAGE_ID');
+    seenMessageIds.add(id);
+    if (!['user', 'assistant', 'system'].includes(message.role)) throw new Error('INVALID_MESSAGE_ROLE');
+    return {
+      id,
+      conversation_id: conversation.id,
+      user_id: userId,
+      role: message.role,
+      content: String(message.content || '').slice(0, 100000),
+      metadata: {
+        images: (message.images || []).filter((url) => typeof url === 'string' && /^https:\/\//i.test(url)).slice(0, 8),
+        messageMetadata: message.metadata || {},
+      },
+      created_at: toIsoTimestamp(message.createdAt, Date.now()),
+    };
+  });
+
   const db = client();
-  const { data: existing, error: lookupError } = await db
-    .from('adam_conversations')
-    .select('user_id')
-    .eq('id', conversation.id)
-    .maybeSingle();
-  if (lookupError) throw lookupError;
-  if (existing && existing.user_id !== userId) throw new Error('CONVERSATION_OWNERSHIP_MISMATCH');
-
-  const now = new Date().toISOString();
-  const createdAt = new Date(conversation.createdAt || Date.now()).toISOString();
-  const updatedAt = new Date(conversation.updatedAt || Date.now()).toISOString();
-
-  const { error: conversationError } = await db.from('adam_conversations').upsert({
+  const now = Date.now();
+  const createdAt = toIsoTimestamp(conversation.createdAt, now);
+  const updatedAt = toIsoTimestamp(conversation.updatedAt, now);
+  const conversationValues = {
     id: conversation.id,
     user_id: userId,
     title: String(conversation.title || 'New conversation').slice(0, 120),
     created_at: createdAt,
     updated_at: updatedAt,
-  }, { onConflict: 'id' });
-  if (conversationError) throw conversationError;
+  };
 
-  const rows = (conversation.messages || []).slice(-100).map((message) => ({
-    id: String(message.id).slice(0, 128),
-    conversation_id: conversation.id,
-    user_id: userId,
-    role: message.role,
-    content: String(message.content || '').slice(0, 100000),
-    metadata: {
-      images: (message.images || []).filter((url) => typeof url === 'string' && /^https:\/\//i.test(url)).slice(0, 8),
-      messageMetadata: message.metadata || {},
-    },
-    created_at: new Date(message.createdAt || Date.now()).toISOString(),
-  })).filter((row) => row.id && ['user', 'assistant', 'system'].includes(row.role));
+  const { error: insertConversationError } = await db
+    .from('adam_conversations')
+    .upsert(conversationValues, { onConflict: 'id', ignoreDuplicates: true });
+  if (insertConversationError) throw insertConversationError;
+
+  const { error: updateConversationError } = await db
+    .from('adam_conversations')
+    .update({ title: conversationValues.title, updated_at: updatedAt })
+    .eq('id', conversation.id)
+    .eq('user_id', userId);
+  if (updateConversationError) throw updateConversationError;
+
+  const { data: ownedConversation, error: ownershipError } = await db
+    .from('adam_conversations')
+    .select('id')
+    .eq('id', conversation.id)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (ownershipError) throw ownershipError;
+  if (!ownedConversation) throw new Error('CONVERSATION_OWNERSHIP_MISMATCH');
 
   if (rows.length) {
-    const { error: messageError } = await db.from('adam_messages').upsert(rows, { onConflict: 'id' });
-    if (messageError) throw messageError;
+    const { error: insertMessagesError } = await db
+      .from('adam_messages')
+      .upsert(rows, { onConflict: 'id', ignoreDuplicates: true });
+    if (insertMessagesError) throw insertMessagesError;
+
+    const { data: ownedMessages, error: messageOwnershipError } = await db
+      .from('adam_messages')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('conversation_id', conversation.id)
+      .in('id', rows.map((row) => row.id));
+    if (messageOwnershipError) throw messageOwnershipError;
+    const ownedIds = new Set((ownedMessages || []).map((row: any) => row.id));
+    if (rows.some((row) => !ownedIds.has(row.id))) throw new Error('MESSAGE_OWNERSHIP_MISMATCH');
   }
 }
 
 export async function deleteUserConversation(userId: string, conversationId: string): Promise<void> {
+  if (!userId || !conversationId) throw new Error('INVALID_CONVERSATION_ID');
   const { error } = await client().from('adam_conversations').delete().eq('id', conversationId).eq('user_id', userId);
   if (error) throw error;
 }
