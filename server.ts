@@ -1345,7 +1345,7 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
   const requestStartedAt = Date.now();
   let aborted = false;
   res.setHeader('X-Request-Id', requestId);
-  const currentApiKey = apiKey || secretsManager.getGeminiApiKey() || (req.headers['x-gemini-api-key'] as string) || '';
+  const currentApiKey = apiKey || secretsManager.getGeminiApiKey() || '';
   console.info('[Adam AI chat] request started', { requestId, model: isOpenRouterConfigured() ? getOpenRouterModel() : model, hasGeminiApiKey: Boolean(currentApiKey), hasOpenRouterKey: isOpenRouterConfigured(), messageCount: Array.isArray(req.body?.messages) ? req.body.messages.length : 0 });
   res.once('close', () => {
     if (!res.writableFinished) aborted = true;
@@ -1358,7 +1358,7 @@ app.post('/api/chat', chatRateLimiter.middleware(), async (req, res) => {
       status: 503,
       durationMs: Date.now() - requestStartedAt,
     });
-    return sendError(res, 503, 'AI_NOT_CONFIGURED', 'No server-side AI provider is configured. Set OPENROUTER_API_KEY or GEMINI_API_KEY in the Vercel environment.');
+    return sendError(res, 503, 'AI_NOT_CONFIGURED', 'No server-side AI provider is configured. Set OPENROUTER_API_KEY, GEMINI_API_KEY, or AI_GATEWAY_API_KEY in the Vercel environment.');
   }
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body ?? {};
   const messages = normalizeMessages(body?.messages ?? body?.message ?? body?.prompt ?? body);
